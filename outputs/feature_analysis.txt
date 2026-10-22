@@ -1,0 +1,117 @@
+Train: (4165, 69), malware=2175, benign=1990
+
+== 1. Themes ==
+DOS header (6): e_cblp, e_cp, e_cparhdr, e_maxalloc, e_sp, e_lfanew
+Entropy (3): E_text, E_data, E_file
+File header (17): NumberOfSections, CreationYear, FH_char0, FH_char1, FH_char2, FH_char3, FH_char4, FH_char5, FH_char6, FH_char7, FH_char8, FH_char9, FH_char10, FH_char11, FH_char12, FH_char13, FH_char14
+File-level (2): filesize, fileinfo
+Optional hdr: DLL characteristics (11): OH_DLLchar0, OH_DLLchar1, OH_DLLchar2, OH_DLLchar3, OH_DLLchar4, OH_DLLchar5, OH_DLLchar6, OH_DLLchar7, OH_DLLchar8, OH_DLLchar9, OH_DLLchar10
+Optional hdr: other (sizes/addresses/alignment) (14): SizeOfCode, SizeOfInitializedData, SizeOfUninitializedData, AddressOfEntryPoint, BaseOfCode, BaseOfData, ImageBase, SectionAlignment, FileAlignment, SizeOfImage, SizeOfHeaders, CheckSum, Subsystem, LoaderFlags
+Optional hdr: stack/heap (4): SizeOfStackReserve, SizeOfStackCommit, SizeOfHeapReserve, SizeOfHeapCommit
+Optional hdr: versions (8): MajorLinkerVersion, MinorLinkerVersion, MajorOperatingSystemVersion, MinorOperatingSystemVersion, MajorImageVersion, MinorImageVersion, MajorSubsystemVersion, MinorSubsystemVersion
+Packer (2): packer, packer_type
+Sections (suspicious count) (2): sus_sections, non_sus_sections
+
+== 2. Constant / duplicate / correlated ==
+Constant (9): ['FH_char1', 'FH_char11', 'FH_char13', 'SectionAlignment', 'FileAlignment', 'OH_DLLchar5', 'OH_DLLchar6', 'OH_DLLchar9', 'OH_DLLchar10']
+Exact duplicate numeric columns: [('FH_char9', 'FH_char10')]
+Pearson |r| > 0.95 pairs (non-constant numeric; packer_type excluded): 9
+  FH_char9 ~ FH_char10: r=1.0000
+  e_cp ~ e_cparhdr: r=1.0000
+  e_cparhdr ~ SizeOfCode: r=0.9998
+  e_cp ~ SizeOfCode: r=0.9998
+  e_cparhdr ~ SizeOfInitializedData: r=0.9990
+  e_cp ~ SizeOfInitializedData: r=0.9990
+  SizeOfCode ~ SizeOfInitializedData: r=0.9989
+  FH_char6 ~ FH_char14: r=0.9978
+  FH_char2 ~ FH_char3: r=0.9701
+Pairs with 0.8 < |r| <= 0.95: 5
+  AddressOfEntryPoint ~ BaseOfData: r=0.9279
+  AddressOfEntryPoint ~ BaseOfCode: r=0.9104
+  MajorImageVersion ~ MinorImageVersion: r=0.8752
+  BaseOfCode ~ BaseOfData: r=0.8143
+  NumberOfSections ~ sus_sections: r=0.8107
+
+== 3. Single-feature separators (train, 5-fold CV, depth-3 tree; raw_auc = max(AUC,1-AUC)) ==
+            feature  raw_auc  tree3_cv_auc  tree3_cv_acc
+           CheckSum   0.7692        0.8134        0.7481
+             E_file   0.6723        0.8075        0.7618
+ MinorLinkerVersion   0.5269        0.7686        0.6752
+             E_data   0.5100        0.7660        0.7301
+          FH_char12   0.7702        0.7640        0.7796
+       sus_sections   0.5747        0.7577        0.7513
+           fileinfo   0.7565        0.7479        0.7541
+             E_text   0.5769        0.7460        0.6982
+ MajorLinkerVersion   0.7097        0.7430        0.6663
+           FH_char0   0.7456        0.7406        0.7390
+        OH_DLLchar2   0.7476        0.7400        0.7563
+        OH_DLLchar0   0.7475        0.7372        0.7546
+AddressOfEntryPoint   0.6306        0.7349        0.7143
+ SizeOfStackReserve   0.7247        0.7250        0.6893
+           filesize   0.5177        0.7244        0.6691
+Specifically:
+         feature  raw_auc  tree3_cv_auc  tree3_cv_acc
+          E_file   0.6723        0.8075        0.7618
+          E_data   0.5100        0.7660        0.7301
+    sus_sections   0.5747        0.7577        0.7513
+        fileinfo   0.7565        0.7479        0.7541
+          E_text   0.5769        0.7460        0.6982
+        filesize   0.5177        0.7244        0.6691
+non_sus_sections   0.5549        0.6022        0.5935
+     packer_type      NaN        0.5718        0.5609
+          packer   0.5134        0.5059        0.5222
+    CreationYear   0.5025        0.5011        0.5222
+Class rate by packer (1=packed): {0: (3529, np.float64(0.5143)), 1: (636, np.float64(0.566))}
+Malware rate by CreationYear: {0: (38, np.float64(0.6579)), 1: (4127, np.float64(0.521))}
+Mean per class fileinfo: {0: 0.8101, 1: 0.297}
+
+== 4. Importance (RF 300 trees, seed 42; permutation = held-out ROC-AUC drop, 5 folds x 5 repeats) ==
+                                                                       theme  rf_impurity  perm_auc_drop_mean  perm_auc_drop_std_across_folds
+FH_char12                                                        File header       0.1399              0.0093                          0.0033
+CheckSum                     Optional hdr: other (sizes/addresses/alignment)       0.0724              0.0010                          0.0004
+E_file                                                               Entropy       0.0699              0.0007                          0.0008
+OH_DLLchar2                                Optional hdr: DLL characteristics       0.0490              0.0002                          0.0003
+FH_char0                                                         File header       0.0433              0.0001                          0.0001
+OH_DLLchar0                                Optional hdr: DLL characteristics       0.0430              0.0003                          0.0004
+filesize                                                          File-level       0.0417              0.0008                          0.0007
+fileinfo                                                          File-level       0.0389              0.0005                          0.0001
+AddressOfEntryPoint          Optional hdr: other (sizes/addresses/alignment)       0.0381              0.0002                          0.0002
+Subsystem                    Optional hdr: other (sizes/addresses/alignment)       0.0334              0.0019                          0.0010
+E_data                                                               Entropy       0.0314              0.0003                          0.0001
+e_lfanew                                                          DOS header       0.0305              0.0002                          0.0001
+MajorImageVersion                                     Optional hdr: versions       0.0297              0.0001                          0.0002
+MajorLinkerVersion                                    Optional hdr: versions       0.0266              0.0000                          0.0001
+MajorSubsystemVersion                                 Optional hdr: versions       0.0247              0.0001                          0.0002
+E_text                                                               Entropy       0.0235              0.0001                          0.0001
+SizeOfStackReserve                                  Optional hdr: stack/heap       0.0218              0.0001                          0.0002
+sus_sections                                     Sections (suspicious count)       0.0202              0.0002                          0.0002
+MajorOperatingSystemVersion                           Optional hdr: versions       0.0196              0.0001                          0.0002
+SizeOfCode                   Optional hdr: other (sizes/addresses/alignment)       0.0194              0.0001                          0.0001
+
+== 5. Ablation (5-fold CV on TRAIN only, default hyperparameters) ==
+              feature_set  n_cols model  roc_auc     f1  precision  recall
+        A_all_nonconstant      60    RF   0.9995 0.9917     0.9886  0.9949
+        A_all_nonconstant      60    DT   0.9736 0.9747     0.9757  0.9738
+B_no_suspected_separators      54    RF   0.9993 0.9888     0.9859  0.9917
+B_no_suspected_separators      54    DT   0.9692 0.9706     0.9707  0.9706
+            C_no_fileinfo      59    RF   0.9993 0.9881     0.9841  0.9922
+            C_no_fileinfo      59    DT   0.9702 0.9715     0.9728  0.9701
+         D_no_packer_cols      58    RF   0.9995 0.9904     0.9881  0.9926
+         D_no_packer_cols      58    DT   0.9749 0.9758     0.9783  0.9733
+   E_no_sus_sections_cols      58    RF   0.9992 0.9915     0.9886  0.9945
+   E_no_sus_sections_cols      58    DT   0.9746 0.9755     0.9779  0.9733
+
+== 6. Extras ==
+Spearman / fraction-equal for the |r|>0.95 pairs (Pearson on heavy-tailed cols is outlier-driven):
+  e_cp ~ e_cparhdr: pearson=1.0000 spearman=0.2801 equal_frac=0.0060
+  e_cp ~ SizeOfCode: pearson=0.9998 spearman=-0.0566 equal_frac=0.0000
+  e_cp ~ SizeOfInitializedData: pearson=0.9990 spearman=0.0542 equal_frac=0.0000
+  e_cparhdr ~ SizeOfCode: pearson=0.9998 spearman=0.0154 equal_frac=0.0002
+  e_cparhdr ~ SizeOfInitializedData: pearson=0.9990 spearman=0.0400 equal_frac=0.0000
+  FH_char2 ~ FH_char3: pearson=0.9701 spearman=0.9701 equal_frac=0.9851
+  FH_char6 ~ FH_char14: pearson=0.9978 spearman=0.9978 equal_frac=0.9998
+  FH_char9 ~ FH_char10: pearson=1.0000 spearman=1.0000 equal_frac=1.0000
+  SizeOfCode ~ SizeOfInitializedData: pearson=0.9989 spearman=0.2677 equal_frac=0.0084
+packer==1 iff packer_type!='NoPacker': True
+Max e_cp / e_cparhdr / SizeOfCode (outlier-driven correlation): {'e_cp': 20050, 'e_cparhdr': 12851, 'SizeOfCode': 1766614113}
+Kept: 58 Dropped: 11

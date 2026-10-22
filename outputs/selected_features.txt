@@ -1,0 +1,81 @@
+# Recommended feature set (train-only analysis). 58 columns kept of 69; packer_type to be one-hot encoded (fit on train).
+e_cblp
+e_cp
+e_cparhdr
+e_maxalloc
+e_sp
+e_lfanew
+NumberOfSections
+CreationYear
+FH_char0
+FH_char2
+FH_char3
+FH_char4
+FH_char5
+FH_char6
+FH_char7
+FH_char8
+FH_char9
+FH_char12
+MajorLinkerVersion
+MinorLinkerVersion
+SizeOfCode
+SizeOfInitializedData
+SizeOfUninitializedData
+AddressOfEntryPoint
+BaseOfCode
+BaseOfData
+ImageBase
+MajorOperatingSystemVersion
+MinorOperatingSystemVersion
+MajorImageVersion
+MinorImageVersion
+MajorSubsystemVersion
+MinorSubsystemVersion
+SizeOfImage
+SizeOfHeaders
+CheckSum
+Subsystem
+OH_DLLchar0
+OH_DLLchar1
+OH_DLLchar2
+OH_DLLchar3
+OH_DLLchar4
+OH_DLLchar7
+OH_DLLchar8
+SizeOfStackReserve
+SizeOfStackCommit
+SizeOfHeapReserve
+SizeOfHeapCommit
+LoaderFlags
+sus_sections
+non_sus_sections
+packer
+packer_type
+E_text
+E_data
+filesize
+E_file
+fileinfo
+
+# Proposed drops (one reason each)
+DROP FH_char1: constant in train (single value)
+DROP FH_char11: constant in train (single value)
+DROP FH_char13: constant in train (single value)
+DROP SectionAlignment: constant in train (single value)
+DROP FileAlignment: constant in train (single value)
+DROP OH_DLLchar5: constant in train (single value)
+DROP OH_DLLchar6: constant in train (single value)
+DROP OH_DLLchar9: constant in train (single value)
+DROP OH_DLLchar10: constant in train (single value)
+DROP FH_char10: exact duplicate of FH_char9
+DROP FH_char14: near-duplicate of FH_char6 (differs in 1 of 4165 rows, r=0.9978)
+
+# Flagged but KEPT
+FH_char3: r=0.97 with FH_char2 (98.5% equal); keep, harmless for trees, mildly collinear for LR
+e_cp, e_cparhdr, SizeOfCode, SizeOfInitializedData: Pearson>0.99 is driven by a few extreme rows; Spearman is low, so NOT redundant
+packer: equals (packer_type != NoPacker); redundant with packer_type but kept (use packer_type one-hot, optionally drop packer for LR)
+fileinfo, packer*, sus_sections, CreationYear, E_*: no single-feature near-perfect separation found; kept in main set, tested in ablation B
+
+# Ablation (same split, CV on train; test only at final evaluation)
+A: all kept features   B: A minus [fileinfo, packer, packer_type, sus_sections, non_sus_sections, CreationYear]
