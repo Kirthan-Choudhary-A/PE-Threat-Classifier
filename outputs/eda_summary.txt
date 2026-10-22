@@ -1,0 +1,32 @@
+Raw shape: (5210, 70)
+
+Dtypes (counts): {'int64': 66, 'float64': 3, 'str': 1}
+
+Class balance (raw): {1: 2722, 0: 2488}
+Non-numeric columns after coercion: ['packer_type']
+fileinfo values: {1: 2835, 0: 2375}
+
+Columns with NaN (not imputed here): none
+
+Exact duplicate rows (extra copies): 3
+Feature-identical groups with conflicting labels: 0
+Rows removed: 3; final sample count: 5207
+Class balance (deduped): {1: 2719, 0: 2488}
+
+CreationYear value counts: {1: 5157, 0: 50}
+packer_type nunique: 40 | top: {'NoPacker': 4393, 'UPXv20MarkusLaszloReiser': 231, 'Armadillov171': 153, 'Armadillov1xxv2xx': 110, 'NETDLLMicrosoft': 93}
+Constant columns: ['FH_char1', 'FH_char11', 'FH_char13', 'SectionAlignment', 'FileAlignment', 'OH_DLLchar5', 'OH_DLLchar6', 'OH_DLLchar10']
+Mean per class for binary-ish check, fileinfo: {0: 0.8118971061093248, 1: 0.2997425524089739}
+
+Numeric describe (selected):
+                   count          mean           std          min           25%            50%            75%           max
+NumberOfSections  5207.0  4.663146e+00  1.923386e+00     1.000000      4.000000       5.000000       5.000000  3.400000e+01
+SizeOfCode        5207.0  1.548398e+06  6.060990e+07     0.000000  11776.000000   37376.000000  135424.000000  3.590647e+09
+filesize          5207.0  7.878213e+05  5.294955e+06  1536.000000  61440.000000  121856.000000  304684.000000  1.657081e+08
+E_file            5207.0  6.364016e+00  1.119777e+00     0.939626      5.695000       6.389507       7.310668  7.999997e+00
+E_text            5207.0  4.939023e+00  2.522397e+00     0.000000      3.886006       6.148320       6.507119  7.999859e+00
+E_data            5207.0  2.524068e+00  2.686107e+00     0.000000      0.000000       1.556895       4.686476  7.999620e+00
+Columns with negative values: none
+
+Class counts  full: {1: 2719, 0: 2488} train: {1: 2175, 0: 1990} test: {1: 544, 0: 498}
+Shapes  X_train: (4165, 69) X_test: (1042, 69)
