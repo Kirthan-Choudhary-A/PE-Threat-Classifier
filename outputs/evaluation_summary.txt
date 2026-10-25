@@ -1,0 +1,32 @@
+Best model (chosen by cross-validated F1 on train, not by test score): random_forest
+  CV F1 = 0.9917 +/- 0.0042; test F1 = 0.9899; test FPR = 0.0100; test ROC-AUC = 0.9991
+
+Test split: n=1042 (544 malware, 498 benign).
+
+F1 by stage (train = mean over CV training folds at the chosen params; CV = 5-fold mean on train; test = held-out):
+model                     train       CV     test   test-CV
+logistic_regression      0.9719   0.9651   0.9686   +0.0036
+decision_tree            0.9989   0.9783   0.9742   -0.0042
+random_forest            1.0000   0.9917   0.9899   -0.0019
+
+Test metrics (precision / recall / F1 / FPR / ROC-AUC | TN FP FN TP | accuracy):
+  logistic_regression 0.9722 / 0.9651 / 0.9686 / 0.0301 / 0.9926 | 483 15 19 525 | 0.9674
+  decision_tree       0.9778 / 0.9706 / 0.9742 / 0.0241 / 0.9730 | 486 12 16 528 | 0.9731
+  random_forest       0.9908 / 0.9890 / 0.9899 / 0.0100 / 0.9991 | 493 5 6 538 | 0.9894
+  majority_baseline   0.5221 / 1.0000 / 0.6860 / 1.0000 / 0.5000 | 0 498 0 544 | 0.5221
+
+Cost of false positives:
+A false positive is a benign file flagged as malware. In deployment this means blocked or quarantined legitimate software,
+lost user trust, analyst time spent triaging alerts, and eventually alert fatigue that makes real detections get ignored.
+A false negative lets malware through, which is usually costlier per event, but FPR matters because benign files vastly
+outnumber malware in real traffic: even a small FPR becomes many false alarms. Here the dataset is near-balanced, so the
+test FPR below is NOT what a real deployment would see. Test FPR: logistic_regression 15 FP of 498 benign (0.0301), decision_tree 12 FP of 498 benign (0.0241), random_forest 5 FP of 498 benign (0.0100).
+
+Limitations:
+- Single 80/20 split with one test set (about 1,000 files); test metrics carry sampling noise, and one extra error moves them noticeably.
+- ClaMP is a research dataset with a roughly balanced class ratio; real-world prevalence of malware is much lower, so precision/FPR here are optimistic.
+- Static PE-header features only: packed/obfuscated or header-forged files and adversarial samples are not tested.
+- Benign and malware samples may come from different collection sources, so models may learn dataset artefacts (e.g. header/compiler fields) rather than maliciousness.
+- Hyperparameters were tuned by CV on train only; the test split was opened once for this evaluation and not used for any choice.
+- Feature importances (impurity-based / coefficient magnitude) describe model behaviour, not causal malicious traits; correlated features split importance.
+- The majority-class baseline predicts the train-majority class for every file and has ROC-AUC 0.5 by construction.
