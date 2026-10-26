@@ -126,6 +126,22 @@ Train-only feature analysis (RF impurity and permutation importance, from `analy
 
 ![Feature importance (train-only analysis)](../outputs/feature_importance.png)
 
+### 6.5 Robustness check (train split only, CV)
+
+After the test evaluation, a further check was run with cross-validation on the train split only (`src/robustness_cv.py`, 5-fold CV repeated 3 times, mean +/- std of F1). The test split was not used again. Each model keeps the hyperparameters tuned earlier on all 58 features; only the input columns change.
+
+| Feature set | Logistic Regression | Decision Tree | Random Forest |
+|---|---|---|---|
+| All 58 columns | 0.9634 +/- 0.0042 | 0.9780 +/- 0.0043 | 0.9908 +/- 0.0034 |
+| without `fileinfo` | 0.9632 +/- 0.0057 | 0.9773 +/- 0.0048 | 0.9895 +/- 0.0033 |
+| without `CheckSum` | 0.9627 +/- 0.0044 | 0.9746 +/- 0.0048 | 0.9883 +/- 0.0034 |
+| without `fileinfo`, `CheckSum` | 0.9626 +/- 0.0054 | 0.9720 +/- 0.0047 | 0.9875 +/- 0.0037 |
+| without `fileinfo`, `CheckSum`, `filesize` | 0.9515 +/- 0.0058 | 0.9692 +/- 0.0063 | 0.9845 +/- 0.0042 |
+
+Removing the two columns suspected of being collection artefacts lowers Random Forest F1 by 0.0033 (0.9908 to 0.9875); removing `filesize` as well lowers it by 0.0063 in total. Logistic Regression is hit hardest by dropping all three (down 0.0119), so the models do use file-level metadata to some extent. This shows that no single one of these columns carries the result; it does not show that the dataset is free of collection bias, since other header fields could carry the same signal.
+
+Logistic Regression picked `C = 100`, the largest value in the original grid. Extending the grid (same repeated CV) gave F1 of 0.9618 (`C = 1`), 0.9623 (10), 0.9634 (100), 0.9633 (1,000), 0.9632 (10,000) and 0.9633 (100,000), so the score is flat beyond `C = 100` and the original choice cost nothing. The final models were not changed.
+
 ## 7. Comparison and discussion
 
 - **Best model: Random Forest**, chosen by cross-validated F1 on the training split (0.9917 +/- 0.0042) before the test set was opened. On the test split it also had the best precision, recall, F1, FPR and ROC-AUC of the three models.
