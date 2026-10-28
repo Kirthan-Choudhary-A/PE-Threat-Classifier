@@ -57,4 +57,40 @@ if os.path.exists(sample):
 assert not pe_extract.extract_safely(b"hello world")["ok"]
 assert not pe_extract.extract_safely(b"MZ" + bytes(200))["ok"]  # MZ but no valid PE headers
 assert not pe_extract.extract_safely(b"MZ" + bytes(pe_extract.MAX_BYTES))["ok"]  # over the size limit
+# "Uncertain" verdict: borderline score or disagreement between the models (rule fixed in advance, not tuned)
+RF, DT, LR = "Random Forest", "Decision Tree", "Logistic Regression"
+V = dc.verdict
+assert V({RF: .97, DT: 1, LR: 1}, RF)[0] == dc.LABEL_MAL and V({RF: .02, DT: 0, LR: 0}, RF)[0] == dc.LABEL_BEN
+lab, why = V({RF: .51, DT: 0, LR: .33}, RF)  # the Uninstall Notion.exe case: borderline AND disagreement
+assert lab == dc.LABEL_UNC and "close to the 0.5 line" in why and "models disagree" in why
+assert V({RF: .45, DT: .1, LR: .2}, RF)[0] == dc.LABEL_UNC  # all say benign, but too close to the line
+assert V({RF: .9, DT: 0, LR: .9}, RF)[0] == dc.LABEL_UNC   # confident score, but a model disagrees
+assert V({RF: .4, DT: 0, LR: 0}, RF)[0] == dc.LABEL_UNC and V({RF: .6, DT: 1, LR: 1}, RF)[0] == dc.LABEL_UNC  # edges inclusive
+assert V({RF: .39, DT: 0, LR: 0}, RF)[0] == dc.LABEL_BEN and V({RF: .61, DT: 1, LR: 1}, RF)[0] == dc.LABEL_MAL
+assert V({RF: .99, DT: 1, LR: .98}, DT)[0] == dc.LABEL_MAL  # the selected model decides which score is checked
+assert V({RF: .6, DT: 1, LR: 1}, DT)[0] == dc.LABEL_MAL     # RF near the line does not matter when DT is selected and all agree
+
+# demo rows with Random Forest selected: 0 and 1 malicious, 3 benign, 29 and 19 uncertain (models disagree)
+from collections import Counter
+demo = dc.list_scans().query("source == 'Test split (demo)'")
+assert Counter(demo["label"]) == {dc.LABEL_MAL: 2, dc.LABEL_BEN: 1, dc.LABEL_UNC: 2}, Counter(demo["label"])
+rows = dc.list_scans().set_index("name")
+assert rows.loc["testsplit_row_29", "label"] == dc.LABEL_UNC and "models disagree" in rows.loc["testsplit_row_29", "reason"]
+assert rows.loc["testsplit_row_19", "label"] == dc.LABEL_UNC and rows.loc["testsplit_row_3", "reason"] == ""
+
+# a scan stored before this rule existed (binary label) is shown with the current rule, without rewriting the database
+import json
+with dc._con() as con:
+    con.execute("INSERT INTO scans(name,sha256,source,model,score,label,scores_json,features_json,created_at) VALUES(?,?,?,?,?,?,?,?,?)",
+                ("legacy.exe", "x" * 64, "old", RF, .51, dc.LABEL_MAL, json.dumps({RF: .51, DT: 0, LR: .33}), "{}", "2020-01-01T00:00:00"))
+assert dc.list_scans().set_index("name").loc["legacy.exe", "label"] == dc.LABEL_UNC
+import sqlite3
+assert sqlite3.connect(dc.DB).execute("SELECT label FROM scans WHERE name='legacy.exe'").fetchone()[0] == dc.LABEL_MAL  # stored text untouched
+
+# the pages render with the new label (Overview cards, History filter)
+at.switch_page("views/overview.py").run()
+assert not at.exception, at.exception
+assert any(dc.LABEL_UNC.upper() in c.value.upper() for c in at.caption), [c.value for c in at.caption][:8]
+at.switch_page("views/history.py").run()
+assert not at.exception, at.exception
 print("dashboard smoke test passed")

@@ -12,7 +12,7 @@ All numbers below come from the files in `outputs/`.
 
 ## Demo flow (about 6 minutes)
 
-**1. Overview (30 s).** Say what the page is for. The stat cards show zero until you scan, which is deliberate: no invented numbers. Click **Scan the 5 demo files**. These are real rows from the held-out test split.
+**1. Overview (30 s).** Say what the page is for. The stat cards show zero until you scan, which is deliberate: no invented numbers. Click **Scan the 5 demo files**. These are real rows from the held-out test split. With Random Forest selected the cards then show 5 scans: 2 potentially malicious, 1 predicted benign and **2 Uncertain**.
 
 **2. Scan File, dataset sample (2 min).** Choose *Dataset sample*, then *By index*, and scan these rows:
 
@@ -20,8 +20,10 @@ All numbers below come from the files in `outputs/`.
 |---|---|---|
 | 0 | malware | All three models say about 1.0. A clear case. |
 | 3 | benign | All three say about 0. A clear case. |
-| 29 | benign | **A false alarm.** Random Forest scores 0.577 and flags it. This is why I report false-positive rate, not just accuracy. |
-| 19 | malware | **A miss.** Random Forest scores 0.477, just under the 0.5 line. |
+| 29 | benign | **Uncertain.** Random Forest scores 0.577, but the Decision Tree says 1.0 and Logistic Regression 0.0. On its own this would be a *false alarm*; the dashboard shows it as unknown instead. This is why I report false-positive rate, not just accuracy. |
+| 19 | malware | **Uncertain.** Random Forest scores 0.477, just under the 0.5 line, while the other two lean malicious. On its own this would be a *miss*. |
+
+Say what **Uncertain** means: the selected model's score is within 0.40-0.60, or the three models disagree. The rule was fixed in advance and changes no model or metric. On the test split it sets aside 58 of 1,042 files (5.6%), 8 of the Random Forest's 11 mistakes are among them, and the error rate on the other files is 0.30% (was 1.06%). Be upfront about the cost: 50 of those 58 were classified correctly, so it is a triage aid, not a better classifier.
 
 Open **Edit header values (what-if)** on row 0, set `E_file`, `E_data`, `E_text`, `CheckSum` and `filesize` to 0, and rescan. In my test the Random Forest score dropped from 1.0 to 0.877. Say the models react to the values directly. Do not claim the edited file is realistic.
 
@@ -36,6 +38,8 @@ Open **Edit header values (what-if)** on row 0, set `E_file`, `E_data`, `E_text`
 **5. Close with limitations (30 s).** Read them yourself before anyone asks: old near-balanced dataset, header features only, a possible file-type shortcut, and real-file scanning not tested on malware.
 
 ## Likely questions, with honest answers
+
+**Did you ever see a false alarm on a real program?** Yes. `Uninstall Notion.exe`, a 158 KB installer stub, scored 0.51 on the Random Forest while the other two models said benign. It is not a DLL, it has high entropy from the compressed payload, an old linker version and stripped header flags, so it looks like old packed malware to a model trained on older data. That case is why I added the **Uncertain** verdict: a borderline score or disagreeing models is shown as unknown instead of "malicious".
 
 **Why not just report accuracy?** A false alarm blocks legitimate software, so I report precision, recall, F1, FPR, the confusion matrix and ROC-AUC. Random Forest: FPR 0.0100.
 

@@ -3,7 +3,7 @@ import json
 import pandas as pd
 import streamlit as st
 
-from dash_common import LABEL_BEN, LABEL_MAL, MODELS, clear_scans, get_scan, list_scans, render_report, top_features
+from dash_common import LABEL_BEN, LABEL_MAL, LABEL_UNC, MODELS, clear_scans, get_scan, list_scans, render_report, top_features
 
 PAGE = 25
 st.title("Scan History")
@@ -14,7 +14,7 @@ if scans.empty:
 
 c1, c2, c3, c4 = st.columns([2, 1, 1, 1])
 q = c1.text_input("Search file name or SHA-256", placeholder="e.g. testsplit_row_0 or 9f86d0...")
-pred = c2.selectbox("Prediction", ["All", LABEL_MAL, LABEL_BEN])
+pred = c2.selectbox("Prediction", ["All", LABEL_MAL, LABEL_BEN, LABEL_UNC])
 mod = c3.selectbox("Model", ["All", *MODELS])
 order = c4.selectbox("Sort", ["Newest first", "Oldest first"])
 

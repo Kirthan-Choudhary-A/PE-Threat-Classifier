@@ -4,7 +4,7 @@ import altair as alt
 import pandas as pd
 import streamlit as st
 
-from dash_common import COLORS, DEMO_ROWS, MODELS, LABEL_BEN, LABEL_MAL, list_scans, metrics_table, record_scans, test_rows
+from dash_common import COLORS, DEMO_ROWS, MODELS, LABEL_BEN, LABEL_MAL, LABEL_UNC, list_scans, metrics_table, record_scans, test_rows
 
 model = st.session_state.get("active_model", "Random Forest")
 scans = list_scans()
@@ -18,12 +18,14 @@ st.caption(f"Last analysis: {last}  |  Active model: {model}")
 
 mal = int((scans["label"] == LABEL_MAL).sum())
 ben = int((scans["label"] == LABEL_BEN).sum())
+unc = int((scans["label"] == LABEL_UNC).sum())
 acc = metrics_table().loc[model.lower().replace(" ", "_"), "accuracy"]
-cols = st.columns(4)
+cols = st.columns(5)
 for col, (title, val, sub) in zip(cols, [
         ("Total scans", len(scans), "scans made in this app"),
         (LABEL_MAL, mal, f"{mal / len(scans):.1%} of scans" if len(scans) else "predictions, not confirmed malware"),
         (LABEL_BEN, ben, f"{ben / len(scans):.1%} of scans" if len(scans) else "no scans yet"),
+        (LABEL_UNC, unc, "models disagree or score near 0.5" if not len(scans) else f"{unc / len(scans):.1%} of scans"),
         ("Test accuracy", f"{acc:.2%}", f"{model}, test split (n=1,042)")]):
     with col.container(border=True):
         st.caption(title.upper())

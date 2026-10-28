@@ -208,6 +208,21 @@ To check whether the Random Forest could be improved, `src/improve_cv.py` tuned 
 
 None of the alternatives is clearly better. The ensemble differs from the current Random Forest by +0.0002 in F1 and -0.0022 in FPR, both well inside one standard deviation (0.0017 to 0.0042) of the fold-to-fold variation. The wider Random Forest grid scored higher in its own tuning folds (0.9922) than on the fresh folds (0.9913), which is the usual optimism of tuning on the same folds. Conclusion: on these 58 header features the models are already at the ceiling of what this dataset supports, so the Random Forest was kept and nothing was re-evaluated on the test split. Further gains would more likely come from better data (for example modern samples and import features) than from more model tuning.
 
+### 6.10 "Uncertain" verdict in the dashboard (triage layer, supplementary)
+Manual testing of the dashboard on a benign program turned up a false alarm. `Uninstall Notion.exe` (a 158 KB NSIS uninstaller, 5 sections including NSIS's `.ndata`, 7 imported DLLs, built in 2018) scores 0.510 on the Random Forest, just above the 0.5 line, while the Decision Tree gives 0.0 and Logistic Regression 0.33. Replacing one feature at a time with the typical benign value and watching the score fall (an approximate local explanation, not an exact one) shows what pushed it up: it is not a DLL (the DLL-flag shortcut of section 6.7, about +0.14), its whole-file entropy is 7.5 against a benign median of 6.2 because of the compressed installer payload (+0.09), its linker version is 6 against a benign median of 9 (+0.06), and the three stripped-binary header flags are set (+0.10 combined). To this model, an installer stub looks like old packed malware. The guessed features are not the cause: flipping each guessed or default feature moves the score only between 0.50 and 0.54, except `fileinfo`, which would give 0.59 if the guess were wrong.
+
+A single "Potentially malicious" for a score of 0.51 and for a score of 1.00 overstates the evidence, so the dashboard now has a third verdict, **Uncertain**. A scan is Uncertain when the selected model's score is within 0.40 to 0.60, or when the three models do not agree on which side of 0.5 the file is. The rule was fixed before it was measured and not tuned. It changes no model, score or metric: the official results in sections 6.1 to 6.3 are unchanged, and scans stored earlier are shown with the current rule without rewriting the database.
+
+What it does on the test split (`src/evaluate_triage.py`, `outputs/triage_check.md`; descriptive, reusing the saved test predictions):
+
+| Selected model | Errors | Files marked Uncertain | Errors among those | Errors caught | Decided files | Errors among decided | Error rate when decided |
+|---|---|---|---|---|---|---|---|
+| Logistic Regression | 34 | 59 (5.7%) | 31 | 91% | 983 | 3 | 0.31% (was 3.26%) |
+| Decision Tree | 28 | 54 (5.2%) | 25 | 89% | 988 | 3 | 0.30% (was 2.69%) |
+| Random Forest | 11 | 58 (5.6%) | 8 | 73% | 984 | 3 | 0.30% (was 1.06%) |
+
+With the Random Forest selected, about one file in eighteen is set aside, 8 of its 11 mistakes are among them, and the error rate on the remaining files falls from 1.06% to 0.30%. The cost is that most of the files set aside are in fact classified correctly (50 of the 58), so the label is a triage aid ("look at this one"), not a better classifier. In the demo rows, a benign file that the Random Forest flags (row 29) and a malware file it misses (row 19) both come out Uncertain, because the other models disagree.
+
 ## 7. Comparison and discussion
 
 - **Best model: Random Forest**, chosen by cross-validated F1 on the training split (0.9917 +/- 0.0042) before the test set was opened. On the test split it also had the best precision, recall, F1, FPR and ROC-AUC of the three models.

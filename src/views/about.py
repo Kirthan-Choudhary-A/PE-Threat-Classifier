@@ -38,4 +38,7 @@ already installed on this PC, and **not** on real malware, so its detection abil
 - One split, no significance test. Packed, obfuscated or adversarial files were not tested.
 - Scores are raw model scores, not calibrated probabilities. "Potentially malicious" means predicted malicious,
   not confirmed malware.
+- **Uncertain** means the selected model's score is within 0.40-0.60 or the three models disagree. It is a triage label
+  on top of unchanged models: on the test split it sets aside 5.6% of files and catches 8 of the Random Forest's 11
+  mistakes, but most files it sets aside are classified correctly.
 """)

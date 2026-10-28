@@ -61,6 +61,15 @@ try:
         shot(pg, "03_scan_real_file_report")
         pg.close()
 
+        pg = open_page("scan_file", "Scan File", 1500)  # a scan the dashboard calls Uncertain (models disagree)
+        pg.get_by_text("By index").click()
+        pg.get_by_label("Test row index").fill("29")
+        pg.get_by_label("Test row index").press("Enter")
+        pg.get_by_role("button", name="Analyze with").click()
+        pg.wait_for_selector("text=Treat this as unknown", timeout=60000)
+        shot(pg, "03b_uncertain_report")
+        pg.close()
+
         pg = open_page("history", "Scan History", 1000)
         shot(pg, "04_scan_history")
         pg.close()

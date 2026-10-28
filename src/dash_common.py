@@ -21,13 +21,30 @@ DB = Path(os.environ.get("STATICSCAN_DB", ROOT / "data" / "scans.db"))  # overri
 CAT = "packer_type"
 MODELS = {"Logistic Regression": "logistic_regression", "Decision Tree": "decision_tree",
           "Random Forest": "random_forest"}
-LABEL_MAL, LABEL_BEN = "Potentially malicious", "Predicted benign"
-COLORS = {LABEL_MAL: "#ef4444", LABEL_BEN: "#22c55e", "Total": "#22d3ee"}
+LABEL_MAL, LABEL_BEN, LABEL_UNC = "Potentially malicious", "Predicted benign", "Uncertain"
+COLORS = {LABEL_MAL: "#ef4444", LABEL_BEN: "#22c55e", LABEL_UNC: "#f59e0b", "Total": "#22d3ee"}
+BORDER = (0.4, 0.6)  # a score this close to the 0.5 line is too close to call (fixed in advance, not tuned)
 DEMO_ROWS = [0, 3, 1, 29, 19]  # real test-split rows: clear malware, clear benign, packed, one FP, one FN
 
 
 def label_for(score):
     return LABEL_MAL if score >= 0.5 else LABEL_BEN
+
+
+def verdict(scores, primary):
+    """(label, reason) for one scan. scores: {model name: score}; primary: the model the user selected.
+    Uncertain when the selected model's score is within BORDER of 0.5, or when the three models do not agree on
+    which side of 0.5 the file is. The models and their scores are unchanged; this only decides what to show."""
+    s, why = scores[primary], []
+    if BORDER[0] <= s <= BORDER[1]:
+        why.append(f"{primary} score {s:.2f} is close to the 0.5 line")
+    mal = [m for m, v in scores.items() if v >= 0.5]
+    ben = [m for m, v in scores.items() if v < 0.5]
+    if mal and ben:
+        why.append(f"models disagree (malicious: {', '.join(mal)}; benign: {', '.join(ben)})")
+    if why:
+        return LABEL_UNC, "; ".join(why)
+    return label_for(s), ""
 
 
 @st.cache_resource
@@ -97,9 +114,18 @@ def _con():
     return con
 
 
+def _apply_verdict(df):
+    """Recompute label and reason from the stored scores, so every scan (older ones too) follows the current rule."""
+    out = [verdict(json.loads(r.scores_json), r.model) for r in df.itertuples()]
+    df = df.copy()
+    df["label"] = [o[0] for o in out]
+    df["reason"] = [o[1] for o in out]
+    return df
+
+
 def list_scans():
     with closing(_con()) as con:
-        return pd.read_sql("SELECT * FROM scans ORDER BY id DESC", con)
+        return _apply_verdict(pd.read_sql("SELECT * FROM scans ORDER BY id DESC", con))
 
 
 def clear_scans():
@@ -117,10 +143,11 @@ def record_scans(X, names, source, model, sha_list=None, extra_list=None):
             sha = sha_list[i] if sha_list else hashlib.sha256(json.dumps(feats, sort_keys=True).encode()).hexdigest()
             extra = json.dumps(extra_list[i]) if extra_list else None
             s = float(scores[model][i])
+            label, _ = verdict({n: float(v[i]) for n, v in scores.items()}, model)
             cur = con.execute(
                 "INSERT INTO scans(name,sha256,source,model,score,label,scores_json,features_json,created_at,extra_json)"
                 " VALUES(?,?,?,?,?,?,?,?,?,?)",
-                (name, sha, source, model, s, label_for(s),
+                (name, sha, source, model, s, label,
                  json.dumps({n: float(v[i]) for n, v in scores.items()}), json.dumps(feats),
                  datetime.now().isoformat(timespec="seconds"), extra))
             ids.append(cur.lastrowid)
@@ -147,7 +174,7 @@ def validate_features(raw, max_rows=50):
 def get_scan(scan_id):
     with closing(_con()) as con:
         r = pd.read_sql("SELECT * FROM scans WHERE id = ?", con, params=(int(scan_id),))
-    return r.iloc[0] if len(r) else None
+    return _apply_verdict(r).iloc[0] if len(r) else None
 
 
 def ood_notes(f, info):
@@ -191,7 +218,8 @@ def report_markdown(rec, ft):
     lines = [f"# Analysis report: {rec['name']}", "",
              f"- Feature-vector SHA-256: `{rec['sha256']}`", f"- Source: {rec['source']}",
              f"- Scanned: {rec['created_at']}", f"- Model: {rec['model']}",
-             f"- **Prediction: {rec['label']}** (model score {rec['score']:.3f})", "",
+             f"- **Prediction: {rec['label']}** (model score {rec['score']:.3f})",
+             *([f"- Why uncertain: {rec['reason']}"] if rec.get("reason") else []), "",
              "Machine-learning predictions are uncertain. This result does not confirm malicious behaviour.", "",
              "## All models", "", "| Model | Score | Prediction |", "|---|---|---|"]
     lines += [f"| {n} | {v:.3f} | {label_for(v)} |" for n, v in s.items()]
@@ -205,7 +233,6 @@ def report_markdown(rec, ft):
 def render_report(rec):
     s = json.loads(rec["scores_json"])
     feats_dict = json.loads(rec["features_json"])
-    mal = rec["label"] == LABEL_MAL
     extra = json.loads(rec["extra_json"]) if isinstance(rec.get("extra_json"), str) else None
     real = bool(extra)
     with st.container(border=True):
@@ -213,7 +240,10 @@ def render_report(rec):
         st.subheader(rec["name"])
         st.caption(f"{'File' if real else 'Feature-vector'} SHA-256: `{rec['sha256']}`  \nSource: {rec['source']}  |  "
                    f"Scanned: {rec['created_at']}")
-        st.markdown(f"#### {'🔴' if mal else '🟢'} :{'red' if mal else 'green'}[{rec['label'].upper()}]")
+        icon, colour = {LABEL_MAL: ("🔴", "red"), LABEL_BEN: ("🟢", "green")}.get(rec["label"], ("🟠", "orange"))
+        st.markdown(f"#### {icon} :{colour}[{rec['label'].upper()}]")
+        if rec.get("reason"):
+            st.caption(f"Why: {rec['reason']}. Treat this as unknown rather than a verdict.")
         st.markdown(f"**Model:** {rec['model']} &nbsp;|&nbsp; **Model score:** {rec['score']:.3f}")
         st.progress(float(rec["score"]))
         st.warning("Machine-learning predictions are uncertain. This result does not confirm malicious behaviour. "
