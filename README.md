@@ -36,10 +36,10 @@ Each script depends on the output of the previous one. Seed 42 is used everywher
 After running the four scripts above (the app reads their saved outputs and models):
 
 ```
-streamlit run src/app.py
+python -m streamlit run src/app.py
 ```
 
-It opens in the browser with two tabs: **Results** (test metrics, ROC, confusion matrices, feature importance, limitations) and **Live prediction** (pick a test-split file, optionally edit a few header values, and see each model's verdict and malware probability). The test rows were already scored once during evaluation, so the live tab is an illustration, not a new evaluation.
+Use `python -m streamlit` (not the bare `streamlit` command), so it runs in the same Python that has the project packages and saved models. It opens in the browser (http://localhost:8501) with two tabs: **Results** (test metrics, ROC, confusion matrices, feature importance, limitations) and **Live prediction** (pick a test-split file, optionally edit a few header values, and see each model's verdict and malware probability). The test rows were already scored once during evaluation, so the live tab is an illustration, not a new evaluation.
 
 ## Folder structure
 
