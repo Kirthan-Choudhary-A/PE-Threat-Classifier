@@ -31,6 +31,16 @@ python src/robustness_cv.py     # optional: CV-only robustness check (train spli
 
 Each script depends on the output of the previous one. Seed 42 is used everywhere.
 
+## Demo UI
+
+After running the four scripts above (the app reads their saved outputs and models):
+
+```
+streamlit run src/app.py
+```
+
+It opens in the browser with two tabs: **Results** (test metrics, ROC, confusion matrices, feature importance, limitations) and **Live prediction** (pick a test-split file, optionally edit a few header values, and see each model's verdict and malware probability). The test rows were already scored once during evaluation, so the live tab is an illustration, not a new evaluation.
+
 ## Folder structure
 
 ```
