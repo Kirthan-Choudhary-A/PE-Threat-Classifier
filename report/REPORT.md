@@ -155,6 +155,33 @@ The dashboard (`src/app.py`) can statically parse an uploaded Windows executable
 
 Most of these files are 64-bit and built with toolchains far newer than the ClaMP samples, so the "outside training data" warnings apply to them. No malware was obtained, so **detection on real malware was not tested**, and nothing here shows that the models catch modern malware. The result only says that on these benign programs the false-alarm rate was low for Random Forest and not zero for the other two models.
 
+### 6.7 How much do the models depend on the DLL-like flag? (train split only, CV)
+
+`FH_char12` is the top Random Forest feature and is set for 55.8% of benign and 1.8% of malware training samples. From the PE header layout it is most likely the "DLL" flag (an inference). `src/dll_shortcut_cv.py` checked how much the models lean on it, using cross-validation on the train split only (the test split was not used).
+
+- **The flag alone is a decent classifier.** The rule "malware if `FH_char12` = 0, else benign" scores accuracy 0.7796 and F1 0.8231 on the training split, so it explains a large part of the class difference but far from all of the models' performance.
+- **Removing the flag** (repeated 5x3 CV, same tuned hyperparameters; mean +/- std of F1):
+
+| Model | All 58 features | Without `FH_char12` | Change |
+|---|---|---|---|
+| Logistic Regression | 0.9634 +/- 0.0042 | 0.9477 +/- 0.0064 | -0.0157 |
+| Decision Tree | 0.9780 +/- 0.0043 | 0.9693 +/- 0.0067 | -0.0087 |
+| Random Forest | 0.9908 +/- 0.0034 | 0.9902 +/- 0.0037 | -0.0006 |
+
+  The Random Forest barely changes (other features carry the same information), while Logistic Regression and the Decision Tree rely on the flag more.
+- **Performance by group** (out-of-fold predictions on the train split, 5-fold; `outputs/dll_shortcut_subgroups.csv`):
+
+| Model | Group | Files | Malware | Recall | False-positive rate |
+|---|---|---|---|---|---|
+| Logistic Regression | `FH_char12`=1 (DLL-like) | 1,150 | 39 | 0.3590 | 0.0054 |
+| Logistic Regression | `FH_char12`=0 (EXE-like) | 3,015 | 2,136 | 0.9757 | 0.0785 |
+| Decision Tree | `FH_char12`=1 (DLL-like) | 1,150 | 39 | 0.7436 | 0.0045 |
+| Decision Tree | `FH_char12`=0 (EXE-like) | 3,015 | 2,136 | 0.9817 | 0.0455 |
+| Random Forest | `FH_char12`=1 (DLL-like) | 1,150 | 39 | 0.8974 | 0.0018 |
+| Random Forest | `FH_char12`=0 (EXE-like) | 3,015 | 2,136 | 0.9967 | 0.0262 |
+
+  Two things stand out. First, the false-positive rate on EXE-like files is several times higher than on DLL-like files, because most benign DLL-like files are easy to recognise; the overall FPR (0.0100 for Random Forest on the test split) is therefore helped by DLLs. Second, the DLL-like group contains only 39 malware samples, so the recall estimates there are noisy (Random Forest: 35 of 39 found). The Logistic Regression recall of 0.3590 on that group shows a simple linear model largely treats DLL-like files as benign.
+
 ## 7. Comparison and discussion
 
 - **Best model: Random Forest**, chosen by cross-validated F1 on the training split (0.9917 +/- 0.0042) before the test set was opened. On the test split it also had the best precision, recall, F1, FPR and ROC-AUC of the three models.
@@ -169,7 +196,7 @@ Most of these files are 64-bit and built with toolchains far newer than the ClaM
 - **Near-balanced classes.** The test set has 544 malware and 498 benign files. Real-world malware prevalence is much lower, so precision and FPR here are optimistic.
 - **Header-only features.** Only static PE-header features were used. Import counts / imported-DLL features are not in this dataset (see Section 3), and no behavioural or code-level features were available.
 - **Dataset source artefacts.** Benign and malware files may come from different collection sources, so models can learn artefacts of how the data was collected instead of malicious behaviour. Examples in the data: `fileinfo` has a mean of 0.8101 for benign and 0.2970 for malware in the training split, and `CheckSum` was the strongest single-feature separator in the analysis (single-feature depth-3 tree CV AUC 0.8134). Both `fileinfo` and `CheckSum` also rank high in the Random Forest importance.
-- **File-type shortcut.** The most important Random Forest feature, `FH_char12`, is set for 56.3% of benign and 1.8% of malware samples (all 5,207 cleaned rows). From the PE header layout this column is most likely the "DLL" flag (an inference; the dataset does not document it), so part of the models' signal may be file type rather than malicious behaviour. A DLL-form malware sample would be at a disadvantage for the same reason. The robustness check in Section 6.5 did not remove this column.
+- **File-type shortcut.** The most important Random Forest feature, `FH_char12`, is set for 56.3% of benign and 1.8% of malware samples (all 5,207 cleaned rows). From the PE header layout this column is most likely the "DLL" flag (an inference; the dataset does not document it), so part of the models' signal may be file type rather than malicious behaviour. Section 6.7 measures this: removing the column barely affects the Random Forest (CV F1 0.9908 to 0.9902) but lowers Logistic Regression by 0.0157, and the false-positive rate on EXE-like files is several times higher than on DLL-like files. Malware in DLL form is rare in this dataset (39 of 2,175 training malware samples are DLL-like), so detection there is poorly measured.
 - **Ablation on suspect columns.** To check whether the suspect columns drive the result, 5-fold CV on the train split (default hyperparameters, `outputs/feature_ablation_cv_train.csv`) was repeated with them removed. Removing them lowered CV F1 only slightly:
 
   | Feature set | Columns | RF F1 | RF ROC-AUC | DT F1 | DT ROC-AUC |

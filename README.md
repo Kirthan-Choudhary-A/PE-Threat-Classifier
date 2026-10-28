@@ -27,6 +27,7 @@ python src/analyze_features.py  # feature analysis on the train split only; writ
 python src/train_models.py      # GridSearchCV (5-fold) on train only; saves models/*.joblib
 python src/evaluate_models.py   # opens the test split once; metrics, plots, evaluation_summary.txt
 python src/robustness_cv.py     # optional: CV-only robustness check (train split), wider LR C grid
+python src/dll_shortcut_cv.py   # optional: CV-only check of the DLL-like flag shortcut (train split)
 ```
 
 Each script depends on the output of the previous one. Seed 42 is used everywhere.
@@ -70,6 +71,7 @@ report/    REPORT.md
 - `outputs/cv_results.csv`, `outputs/cv_best_params.json` - cross-validation results and best hyperparameters
 - `outputs/metrics.csv`, `outputs/evaluation_summary.txt` - final test-set metrics
 - `outputs/robustness_cv.csv`, `outputs/lr_C_extended_cv.csv` - robustness check (CV on train only)
+- `outputs/dll_shortcut_cv.csv`, `outputs/dll_shortcut_subgroups.csv` - DLL-like flag check (CV on train only)
 - `outputs/*.png` - confusion matrices, ROC curves, model comparison, feature importance
 
 ## Report

@@ -88,3 +88,12 @@ with st.expander("Cross-validation vs test, and robustness check"):
     st.dataframe(cmp_, width="stretch")
     st.markdown("Repeated 5x3 CV on train with suspect columns removed (`outputs/robustness_cv.csv`):")
     st.dataframe(pd.read_csv(OUT / "robustness_cv.csv").round(4), hide_index=True, width="stretch")
+
+with st.expander("DLL-like flag check (FH_char12, train-split CV)"):
+    st.markdown("`FH_char12` is the top Random Forest feature and is most likely the DLL flag. "
+                "CV F1 with and without it, then out-of-fold performance by group "
+                "(`src/dll_shortcut_cv.py`, train split only):")
+    st.dataframe(pd.read_csv(OUT / "dll_shortcut_cv.csv").round(4), hide_index=True, width="stretch")
+    st.dataframe(pd.read_csv(OUT / "dll_shortcut_subgroups.csv").round(4), hide_index=True, width="stretch")
+    st.caption("False-positive rates are several times higher on EXE-like files than on DLL-like files, and the "
+               "DLL-like group has only 39 malware samples, so its recall is noisy.")
