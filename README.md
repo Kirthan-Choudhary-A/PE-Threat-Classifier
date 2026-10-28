@@ -62,7 +62,7 @@ src/       the pipeline scripts, plus app.py and views/ (dashboard)
 tests/     dashboard smoke test
 models/    trained pipelines (logistic_regression, decision_tree, random_forest .joblib)
 outputs/   all results: text summaries, CSV tables, PNG plots
-report/    REPORT.md
+report/    REPORT.md, DEMO_GUIDE.md (demo flow and viva Q&A), screenshots/
 ```
 
 ## Where the results are
