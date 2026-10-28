@@ -42,13 +42,13 @@ python -m streamlit run src/app.py
 Use `python -m streamlit` (not the bare `streamlit` command) so it runs in the same Python that has the project packages. It opens at http://localhost:8501 with a dark multi-page layout:
 
 - **Overview**: scan counts, activity chart and recent scans (zeros and empty states until you scan something), plus the real test accuracy.
-- **Scan File**: score a dataset sample (with what-if editing) or an uploaded feature CSV (template provided). Shows a report with all three models, top features vs dataset medians, and a Markdown download.
+- **Scan File**: score a dataset sample (with what-if editing), an uploaded feature CSV (template provided), or an uploaded Windows executable (**approximate**: parsed statically with `pefile`, never run; 10 of the 58 features are guessed or defaulted, and the report says which). Shows all three models, PE sections and imports, "outside training data" warnings, top features vs dataset medians, and a Markdown download.
 - **Scan History**: search, filter, export, open a report, or compare two scans.
 - **Model Performance**: real test metrics, grouped bar chart, ROC and precision-recall curves, confusion matrices, feature importance, CV vs test and the robustness check.
 - **Dataset Explorer**: class balance, data-quality counts, per-class feature histograms and a correlation heatmap.
 - **About Project**: method and limitations.
 
-Scans are stored in `data/scans.db` (not committed). The app scores rows of pre-extracted features only and never parses or executes an executable; real `.exe` upload is deliberately not supported (see About Project). Dataset samples come from the test split, which was already scored once, so they illustrate the models and are not a new evaluation.
+Scans are stored in `data/scans.db` (not committed). Uploaded executables are parsed in a separate process with a timeout and deleted afterwards; only their features and SHA-256 are stored. Nothing is ever executed. Real-file scanning has only been checked for false alarms on programs installed on this PC (`python src/probe_benign_files.py`, results in `outputs/real_file_probe.txt`), not on malware. Dataset samples come from the test split, which was already scored once, so they illustrate the models and are not a new evaluation.
 
 Smoke test: `python tests/test_dashboard.py`
 

@@ -91,6 +91,8 @@ def _con():
     con.execute("""CREATE TABLE IF NOT EXISTS scans(
         id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, sha256 TEXT, source TEXT, model TEXT,
         score REAL, label TEXT, scores_json TEXT, features_json TEXT, created_at TEXT)""")
+    if "extra_json" not in [r[1] for r in con.execute("PRAGMA table_info(scans)")]:
+        con.execute("ALTER TABLE scans ADD COLUMN extra_json TEXT")  # PE info for real-file scans
     return con
 
 
@@ -104,21 +106,22 @@ def clear_scans():
         con.execute("DELETE FROM scans")
 
 
-def record_scans(X, names, source, model):
+def record_scans(X, names, source, model, sha_list=None, extra_list=None):
     """Score every row with all three models, store one scan per row. Returns the new ids."""
     scores = predict_all(X)
     ids = []
     with closing(_con()) as con, con:
         for i, name in enumerate(names):
             feats = json.loads(X.iloc[[i]].to_json(orient="records"))[0]
-            sha = hashlib.sha256(json.dumps(feats, sort_keys=True).encode()).hexdigest()
+            sha = sha_list[i] if sha_list else hashlib.sha256(json.dumps(feats, sort_keys=True).encode()).hexdigest()
+            extra = json.dumps(extra_list[i]) if extra_list else None
             s = float(scores[model][i])
             cur = con.execute(
-                "INSERT INTO scans(name,sha256,source,model,score,label,scores_json,features_json,created_at)"
-                " VALUES(?,?,?,?,?,?,?,?,?)",
+                "INSERT INTO scans(name,sha256,source,model,score,label,scores_json,features_json,created_at,extra_json)"
+                " VALUES(?,?,?,?,?,?,?,?,?,?)",
                 (name, sha, source, model, s, label_for(s),
                  json.dumps({n: float(v[i]) for n, v in scores.items()}), json.dumps(feats),
-                 datetime.now().isoformat(timespec="seconds")))
+                 datetime.now().isoformat(timespec="seconds"), extra))
             ids.append(cur.lastrowid)
     return ids
 
@@ -144,6 +147,25 @@ def get_scan(scan_id):
     with closing(_con()) as con:
         r = pd.read_sql("SELECT * FROM scans WHERE id = ?", con, params=(int(scan_id),))
     return r.iloc[0] if len(r) else None
+
+
+def ood_notes(f, info):
+    """Warnings when an uploaded file looks unlike the ClaMP training samples."""
+    feats, df = load_data()
+    benign = df[df["class"] == 0]
+    notes = []
+    share = float(df["FH_char7"].mean())
+    if info["pe_format"] == "PE32+":
+        notes.append(f"64-bit (PE32+) image, but {share:.1%} of ClaMP samples carry the 32-bit machine flag.")
+    for col, label in [("MajorLinkerVersion", "linker version"), ("MajorOperatingSystemVersion", "OS version"),
+                       ("MajorSubsystemVersion", "subsystem version")]:
+        if f[col] > benign[col].max():
+            notes.append(f"{label} {f[col]} is above the maximum seen in benign ClaMP samples ({int(benign[col].max())}).")
+    num = [c for c in feats if c != CAT]
+    out = [c for c in num if not df[c].min() <= f[c] <= df[c].max()]
+    if out:
+        notes.append(f"{len(out)} feature value(s) outside the training range: {', '.join(out[:6])}.")
+    return notes
 
 
 # ---- report ---------------------------------------------------------------
@@ -182,10 +204,12 @@ def render_report(rec):
     s = json.loads(rec["scores_json"])
     feats_dict = json.loads(rec["features_json"])
     mal = rec["label"] == LABEL_MAL
+    extra = json.loads(rec["extra_json"]) if isinstance(rec.get("extra_json"), str) else None
+    real = bool(extra)
     with st.container(border=True):
         st.caption("FILE ANALYSIS REPORT")
         st.subheader(rec["name"])
-        st.caption(f"Feature-vector SHA-256: `{rec['sha256']}`  \nSource: {rec['source']}  |  "
+        st.caption(f"{'File' if real else 'Feature-vector'} SHA-256: `{rec['sha256']}`  \nSource: {rec['source']}  |  "
                    f"Scanned: {rec['created_at']}")
         st.markdown(f"#### {'🔴' if mal else '🟢'} :{'red' if mal else 'green'}[{rec['label'].upper()}]")
         st.markdown(f"**Model:** {rec['model']} &nbsp;|&nbsp; **Model score:** {rec['score']:.3f}")
@@ -193,6 +217,23 @@ def render_report(rec):
         st.warning("Machine-learning predictions are uncertain. This result does not confirm malicious behaviour. "
                    "The score is a raw model score (for Random Forest, the average vote of its trees), "
                    "not a calibrated probability.", icon="⚠️")
+    if real:
+        for n in extra["ood"]:
+            st.warning(f"Outside training data: {n} The verdict is less reliable.", icon="🧭")
+        st.info("Approximate features: only part of the 58 features can be read exactly from a real file. "
+                "The verdict is indicative only. See the provenance table below.", icon="ℹ️")
+        i = extra["info"]
+        with st.container(border=True):
+            st.markdown("**PE file information** (read statically; not all of it is a model feature)")
+            a, b, c, d_ = st.columns(4)
+            a.metric("Format", i["pe_format"] + (" DLL" if i["is_dll"] else ""))
+            b.metric("File size", f"{i['file_size'] / 1024:,.0f} KB")
+            c.metric("Sections", len(i["sections"]))
+            d_.metric("Imports", f"{i['imported_dlls']} DLLs / {i['imported_functions']} functions")
+            st.dataframe(pd.DataFrame(i["sections"]).rename(columns={
+                "name": "Section", "virtual_size": "Virtual size", "raw_size": "Raw size", "entropy": "Entropy",
+                "flags": "Flags"}), hide_index=True, width="stretch")
+            st.caption("High entropy or unusual permissions are clues that need context, not proof of malware.")
     c1, c2 = st.columns([1, 2])
     with c1.container(border=True):
         st.markdown("**All three models**")
@@ -204,7 +245,12 @@ def render_report(rec):
         st.dataframe(ft, hide_index=True, width="stretch")
         st.caption(f"Packer: `{feats_dict.get(CAT)}`. Unusual values are clues that need context, "
                    "not proof of malicious behaviour.")
-    with st.expander("All 58 feature values"):
-        st.dataframe(pd.DataFrame({"value": {k: str(v) for k, v in feats_dict.items()}}), width="stretch")
+    with st.expander("All 58 feature values" + (" and where each came from" if real else "")):
+        tbl = pd.DataFrame({"value": {k: str(v) for k, v in feats_dict.items()}})
+        if real:
+            tbl["origin"] = pd.Series(extra["provenance"])
+            st.caption("extracted = raw header value or entropy; inferred = flag bit order inferred from the dataset; "
+                       "best guess = derived 0/1 flag whose ClaMP definition is unknown; default = not checked.")
+        st.dataframe(tbl, width="stretch")
     st.download_button("Download report (Markdown)", report_markdown(rec, ft),
                        file_name=f"report_{rec['id']}.md", mime="text/markdown")

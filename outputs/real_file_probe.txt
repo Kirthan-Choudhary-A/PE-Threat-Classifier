@@ -1,0 +1,11 @@
+False-alarm probe on files installed on this PC (assumed benign; no malware used)
+
+EXE files: 62 parsed (sampling seed 7); formats {'PE32+': 51, 'PE32': 11}
+  Logistic Regression: flagged 4/62 as potentially malicious; highest score 1.000
+  Decision Tree: flagged 1/62 as potentially malicious; highest score 1.000
+  Random Forest: flagged 0/62 as potentially malicious; highest score 0.473
+
+DLL files: 60 parsed (sampling seed 42); formats {'PE32+': 31, 'PE32': 29}
+  Logistic Regression: flagged 3/60 as potentially malicious; highest score 1.000
+  Decision Tree: flagged 0/60 as potentially malicious; highest score 0.000
+  Random Forest: flagged 0/60 as potentially malicious; highest score 0.333

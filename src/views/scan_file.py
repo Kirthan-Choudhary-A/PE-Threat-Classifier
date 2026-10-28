@@ -1,20 +1,22 @@
+import hashlib
 import io
 
 import pandas as pd
 import streamlit as st
 
-from dash_common import CAT, get_scan, load_data, record_scans, render_report, test_rows, validate_features
+from dash_common import CAT, get_scan, load_data, ood_notes, record_scans, render_report, test_rows, validate_features
+from pe_extract import extract_safely
 
 MAX_ROWS, MAX_BYTES = 50, 2_000_000
 feats, _ = load_data()
 model = st.session_state.get("active_model", "Random Forest")
 
 st.title("Scan File")
-st.caption("Static analysis only. The app scores a row of pre-extracted PE-header features; "
-           "no file is executed, and real .exe upload is not supported (see About Project).")
+st.caption("Static analysis only. Files are parsed, never executed.")
 
-src = st.radio("Source", ["Dataset sample (test split)", "Upload feature CSV"], horizontal=True)
-X, names, source = None, None, None
+src = st.radio("Source", ["Dataset sample (test split)", "Upload feature CSV", "Upload executable (approximate)"],
+               horizontal=True)
+X, names, source, sha_list, extra_list = None, None, None, None, None
 
 if src.startswith("Dataset"):
     t = test_rows()
@@ -39,6 +41,36 @@ if src.startswith("Dataset"):
             row[c] = new
     X, names = row, [f"testsplit_row_{idx}" + ("_edited" if edited else "")]
     source = f"Test split row {idx}" + (" (values edited)" if edited else "")
+elif src.startswith("Upload exec"):
+    st.warning("Approximate: the ClaMP feature definitions are only partly documented, so 10 of the 58 features are "
+               "guessed or defaulted (packer signatures are not checked). The verdict is indicative only. It was "
+               "tested for false alarms on benign programs, not on real malware (no malware was obtained).",
+               icon="⚠️")
+    up = st.file_uploader("Windows executable (.exe / .dll, max 20 MB). It is parsed in a separate process and "
+                          "deleted; only its features and SHA-256 are stored.", type=["exe", "dll"])
+    if up is not None:
+        st.caption(f"Selected: {up.name} ({up.size / 1024:.1f} KB)")
+        if st.button("Extract static features"):
+            with st.status("Extracting static features", expanded=True) as status:
+                data = up.getvalue()
+                st.write("✓ File received")
+                res = extract_safely(data)
+                if not res["ok"]:
+                    status.update(label="Could not analyze this file", state="error")
+                    st.session_state.pop("pe_pending", None)
+                    st.error(res["error"])
+                else:
+                    st.write(f"✓ PE format validated ({res['info']['pe_format']})")
+                    st.write("✓ Static features extracted with pefile (file not executed)")
+                    st.session_state["pe_pending"] = {"name": up.name, "sha": hashlib.sha256(data).hexdigest(), **res}
+                    status.update(label="Features extracted", state="complete", expanded=False)
+        pend = st.session_state.get("pe_pending")
+        if pend and pend["name"] == up.name:
+            X = pd.DataFrame([pend["features"]])[feats]
+            names, sha_list = [pend["name"]], [pend["sha"]]
+            source = "Uploaded executable (static parse, approximate features)"
+            extra_list = [{"info": pend["info"], "provenance": {c: pend["provenance"][c] for c in feats},
+                           "ood": ood_notes(pend["features"], pend["info"])}]
 else:
     template = test_rows().iloc[[0]][feats]
     st.download_button("Download CSV template", template.to_csv(index=False), "feature_template.csv", "text/csv")
@@ -68,7 +100,7 @@ if X is not None and st.button(f"Analyze with {model}", type="primary"):
         st.write("✓ Input received")
         st.write(f"✓ Feature schema validated ({len(feats)} columns, {len(X)} row(s))")
         st.write("✓ Feature vector prepared")
-        ids = record_scans(X, names, source, model)
+        ids = record_scans(X, names, source, model, sha_list, extra_list)
         st.write("✓ Three models scored; result saved to scan history")
         status.update(label="Analysis complete", state="complete", expanded=False)
     st.session_state["last_scan_ids"] = ids

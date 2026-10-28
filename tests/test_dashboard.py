@@ -36,4 +36,25 @@ for page in ["scan_file", "history", "performance", "dataset", "about", "overvie
 at.switch_page("views/scan_file.py").run()
 [b for b in at.button if b.label.startswith("Analyze")][0].click().run()
 assert not at.exception and len(dc.list_scans()) == 6
+# real-file extraction (static parse of a benign Windows file), error handling, and its report
+import os
+import pe_extract
+sample = r"C:\Windows\System32\notepad.exe"
+if os.path.exists(sample):
+    res = pe_extract.extract_safely(open(sample, "rb").read())
+    assert res["ok"] and set(feats) <= set(res["features"]), res
+    assert len(res["info"]["sections"]) > 0 and res["info"]["imported_dlls"] > 0
+    Xr = pd.DataFrame([res["features"]])[feats]
+    extra = {"info": res["info"], "provenance": {c: res["provenance"][c] for c in feats},
+             "ood": dc.ood_notes(res["features"], res["info"])}
+    assert any("64-bit" in n for n in extra["ood"])  # modern 64-bit file is flagged as unlike the training data
+    rid = dc.record_scans(Xr, ["notepad.exe"], "Uploaded executable (test)", "Random Forest",
+                          ["a" * 64], [extra])[0]
+    at.session_state["view_id"] = rid
+    at.switch_page("views/history.py").run()
+    assert not at.exception, at.exception
+    assert any("Approximate features" in i.value for i in at.info)
+assert not pe_extract.extract_safely(b"hello world")["ok"]
+assert not pe_extract.extract_safely(b"MZ" + bytes(200))["ok"]  # MZ but no valid PE headers
+assert not pe_extract.extract_safely(b"MZ" + bytes(pe_extract.MAX_BYTES))["ok"]  # over the size limit
 print("dashboard smoke test passed")

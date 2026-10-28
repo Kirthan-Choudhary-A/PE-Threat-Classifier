@@ -13,19 +13,28 @@ statically extracted PE-header features (ClaMP dataset).
 4. Evaluate on the held-out test split once; the best model is chosen by CV F1 (Random Forest).
 
 ### What the Scan File page does
-It takes a row of pre-extracted features (a dataset sample, or a CSV you upload), runs all three models and
-stores the result in a local scan history. It does **not** parse or execute executables.
+It scores a row of features (a dataset sample, or a CSV you upload) or an uploaded Windows executable, runs all
+three models and stores the result in a local scan history. Executables are only **parsed** (`pefile`, in a
+separate process with a timeout), never run, and the file is deleted after parsing.
 
-### Why there is no real `.exe` upload
-The models need the exact 58 ClaMP feature definitions. Most header fields could be read with a PE parser, but
-`packer_type` comes from a packer-signature database and the exact definitions of `fileinfo` and `sus_sections`
-are not documented in the dataset, so features from an uploaded file would not match the training data and the
-verdict would be unreliable. Supporting it would mean retraining on features that can be extracted faithfully.
+### How reliable is real-file scanning?
+Only approximately. The models need the 58 ClaMP features, but ClaMP's definitions are only partly documented:
+- 31 features are read directly (header values, entropy, file size).
+- 17 are bit flags whose bit order was inferred from the data.
+- 8 are derived 0/1 flags whose exact definition is a best guess (`fileinfo`, `CreationYear`, `ImageBase`,
+  `SizeOfImage`, `SizeOfHeaders`, `LoaderFlags`, `sus_sections`, `non_sus_sections`).
+- 2 are not checked and set to defaults (`packer`, `packer_type`), because no packer signature database is used.
+
+Every report lists where each feature came from, and warns when the file looks unlike the training data
+(for example 64-bit files, newer linkers, newer Windows versions). It was tested for false alarms on programs
+already installed on this PC, and **not** on real malware, so its detection ability on uploaded files is unknown.
 
 ### Limitations
 - Old, near-balanced research dataset; scores do not carry over to real traffic.
 - Header features only; imported-function and DLL counts are not in the dataset.
 - Benign and malware samples may come from different sources (collection artefacts, e.g. `fileinfo`, `CheckSum`).
+- The strongest feature (`FH_char12`, probably the DLL flag) is set for 56.3% of benign and 1.8% of malware
+  samples, so part of the signal may be file type rather than behaviour.
 - One split, no significance test. Packed, obfuscated or adversarial files were not tested.
 - Scores are raw model scores, not calibrated probabilities. "Potentially malicious" means predicted malicious,
   not confirmed malware.

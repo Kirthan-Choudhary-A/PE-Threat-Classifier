@@ -6,7 +6,7 @@ A student lab project. All numbers below are copied from the files in `outputs/`
 
 To train and compare three machine-learning models (Logistic Regression, Decision Tree, Random Forest) that classify Windows PE files as benign (0) or malicious (1), using only statically extracted PE-header features, and to evaluate them honestly (single held-out test set, cross-validation for all tuning, false-positive rate reported alongside accuracy-type metrics).
 
-Only a pre-extracted feature CSV was used. No malware binary was downloaded, unpacked or run.
+Training, tuning and evaluation used only a pre-extracted feature CSV. No malware binary was downloaded, unpacked or run. The optional demo dashboard can also statically parse an uploaded Windows executable (see Section 6.6); parsing never executes the file.
 
 ## 2. Dataset
 
@@ -142,6 +142,19 @@ Removing the two columns suspected of being collection artefacts lowers Random F
 
 Logistic Regression picked `C = 100`, the largest value in the original grid. Extending the grid (same repeated CV) gave F1 of 0.9618 (`C = 1`), 0.9623 (10), 0.9634 (100), 0.9633 (1,000), 0.9632 (10,000) and 0.9633 (100,000), so the score is flat beyond `C = 100` and the original choice cost nothing. The final models were not changed.
 
+### 6.6 Scanning real files in the dashboard (approximate, not part of the evaluation)
+
+The dashboard (`src/app.py`) can statically parse an uploaded Windows executable with `pefile` (`src/pe_extract.py`) and feed the extracted features to the trained models. This is a demonstration feature and **not** part of the evaluation above. It is approximate because the ClaMP feature definitions are only partly documented. Of the 58 model features, 31 are read directly (header values, entropy, file size), 17 are bit flags whose bit order was inferred from the data (`FH_char*`, `OH_DLLchar*`), 8 are derived 0/1 flags whose exact definition is a best guess (`fileinfo`, `CreationYear`, `ImageBase`, `SizeOfImage`, `SizeOfHeaders`, `LoaderFlags`, `sus_sections`, `non_sus_sections`), and 2 are not checked and set to defaults (`packer`, `packer_type`). Every report shows the origin of each feature and warns when a file looks unlike the training data (for example 64-bit images, newer linker or OS versions).
+
+**What was tested.** `src/probe_benign_files.py` ran the extractor and models on programs already installed on this PC, assumed to be benign but not verified (`outputs/real_file_probe.txt`):
+
+| Sample | Parsed | Logistic Regression flagged | Decision Tree flagged | Random Forest flagged (highest score) |
+|---|---|---|---|---|
+| `.exe` files | 62 | 4 | 1 | 0 (0.473) |
+| `.dll` files | 60 | 3 | 0 | 0 (0.333) |
+
+Most of these files are 64-bit and built with toolchains far newer than the ClaMP samples, so the "outside training data" warnings apply to them. No malware was obtained, so **detection on real malware was not tested**, and nothing here shows that the models catch modern malware. The result only says that on these benign programs the false-alarm rate was low for Random Forest and not zero for the other two models.
+
 ## 7. Comparison and discussion
 
 - **Best model: Random Forest**, chosen by cross-validated F1 on the training split (0.9917 +/- 0.0042) before the test set was opened. On the test split it also had the best precision, recall, F1, FPR and ROC-AUC of the three models.
@@ -156,6 +169,7 @@ Logistic Regression picked `C = 100`, the largest value in the original grid. Ex
 - **Near-balanced classes.** The test set has 544 malware and 498 benign files. Real-world malware prevalence is much lower, so precision and FPR here are optimistic.
 - **Header-only features.** Only static PE-header features were used. Import counts / imported-DLL features are not in this dataset (see Section 3), and no behavioural or code-level features were available.
 - **Dataset source artefacts.** Benign and malware files may come from different collection sources, so models can learn artefacts of how the data was collected instead of malicious behaviour. Examples in the data: `fileinfo` has a mean of 0.8101 for benign and 0.2970 for malware in the training split, and `CheckSum` was the strongest single-feature separator in the analysis (single-feature depth-3 tree CV AUC 0.8134). Both `fileinfo` and `CheckSum` also rank high in the Random Forest importance.
+- **File-type shortcut.** The most important Random Forest feature, `FH_char12`, is set for 56.3% of benign and 1.8% of malware samples (all 5,207 cleaned rows). From the PE header layout this column is most likely the "DLL" flag (an inference; the dataset does not document it), so part of the models' signal may be file type rather than malicious behaviour. A DLL-form malware sample would be at a disadvantage for the same reason. The robustness check in Section 6.5 did not remove this column.
 - **Ablation on suspect columns.** To check whether the suspect columns drive the result, 5-fold CV on the train split (default hyperparameters, `outputs/feature_ablation_cv_train.csv`) was repeated with them removed. Removing them lowered CV F1 only slightly:
 
   | Feature set | Columns | RF F1 | RF ROC-AUC | DT F1 | DT ROC-AUC |
