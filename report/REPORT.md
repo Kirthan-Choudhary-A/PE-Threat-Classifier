@@ -229,3 +229,15 @@ The single-split test results (Random Forest F1 0.9899 and FPR 0.0100; Decision 
 ## 9. Conclusion
 
 On the ClaMP header features, a Random Forest chosen by cross-validation reached test F1 0.9899, test ROC-AUC 0.9991 and 5 false positives out of 498 benign files, ahead of the Decision Tree (F1 0.9742) and Logistic Regression (F1 0.9686) and far above the majority baseline (F1 0.6860). The ablation suggests the result is not tied to one suspect column, but the data is near-balanced, header-only, old and possibly affected by collection artefacts, and only one split was evaluated. These results show the approach works on this dataset; they are not evidence of how the models would perform on real-world files.
+
+## Appendix A. Dashboard screenshots
+
+The optional demo dashboard (`python -m streamlit run src/app.py`) was captured with `tests/take_screenshots.py`, which runs it on a throwaway scan database and uses a benign Windows file (`notepad.exe`) for the real-file scan.
+
+![Overview with five demo scans](screenshots/02_overview_with_scans.png)
+
+![Real-file scan report for notepad.exe, with PE sections and "outside the training data" warnings](screenshots/03_scan_real_file_report.png)
+
+![Model Performance page](screenshots/05_model_performance.png)
+
+![Dataset Explorer page](screenshots/06_dataset_explorer.png)

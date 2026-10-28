@@ -28,20 +28,25 @@ st.caption(f"Majority-class baseline for reference: F1 {base['f1']:.4f}, accurac
 g1, g2 = st.columns(2)
 long = (M.loc[list(key.values()), ["precision", "recall", "f1", "fpr"]].reset_index()
         .melt("model", var_name="metric", value_name="value"))
+long["model"] = long["model"].map({v: k for k, v in key.items()})
+long["metric"] = long["metric"].map({"precision": "Precision", "recall": "Recall", "f1": "F1", "fpr": "FPR"})
 with g1.container(border=True):
     st.markdown("**Precision, recall, F1 and FPR**")
     st.altair_chart(alt.Chart(long).mark_bar().encode(
-        x=alt.X("metric:N", title=None), xOffset="model:N", y=alt.Y("value:Q", title=None),
-        color=alt.Color("model:N", title=None)).properties(height=300), width="stretch")
+        x=alt.X("metric:N", title=None, sort=["Precision", "Recall", "F1", "FPR"], axis=alt.Axis(labelAngle=0)),
+        xOffset="model:N", y=alt.Y("value:Q", title=None),
+        color=alt.Color("model:N", title=None, legend=alt.Legend(orient="bottom"))).properties(height=300),
+        width="stretch")
 
 y, sc = test_scores()
-roc, pr = [], []
+roc, pr, areas = [], [], {}
 for name, k in key.items():
     s = sc[name]
     fpr, tpr, _ = roc_curve(y, s)
-    roc.append(pd.DataFrame({"fpr": fpr, "tpr": tpr, "model": f"{name} (AUC {auc(fpr, tpr):.4f})"}))
+    roc.append(pd.DataFrame({"fpr": fpr, "tpr": tpr, "model": name}))
     p, r_, _ = precision_recall_curve(y, s)
-    pr.append(pd.DataFrame({"recall": r_, "precision": p, "model": f"{name} (AP {average_precision_score(y, s):.4f})"}))
+    pr.append(pd.DataFrame({"recall": r_, "precision": p, "model": name}))
+    areas[name] = (auc(fpr, tpr), average_precision_score(y, s))
 with g2.container(border=True):
     st.markdown("**ROC and precision-recall curves**")
     which = st.radio("Curve", ["ROC", "Precision-recall"], horizontal=True, label_visibility="collapsed")
@@ -52,7 +57,10 @@ with g2.container(border=True):
     st.altair_chart(alt.Chart(d).mark_line().encode(
         x=alt.X(f"{x}:Q", title=x.upper() if x == "fpr" else "Recall"),
         y=alt.Y(f"{yy}:Q", title=yy.upper() if yy == "tpr" else "Precision"),
-        color=alt.Color("model:N", title=None)).properties(height=260), width="stretch")
+        color=alt.Color("model:N", title=None, legend=alt.Legend(orient="bottom"))).properties(height=260),
+        width="stretch")
+    st.caption(("ROC-AUC: " if which == "ROC" else "Average precision: ")
+               + " · ".join(f"{n} {v[0 if which == 'ROC' else 1]:.4f}" for n, v in areas.items()))
     st.caption("Curves are recomputed from the saved models on the same test split (read-only, no tuning).")
 
 st.markdown("**Confusion matrices (test split, malware = positive class)**")
@@ -62,11 +70,11 @@ for col, (name, k) in zip(cm_cols, key.items()):
     cm = pd.DataFrame([("Benign", "Benign", int(r["TN"])), ("Benign", "Malicious", int(r["FP"])),
                        ("Malicious", "Benign", int(r["FN"])), ("Malicious", "Malicious", int(r["TP"]))],
                       columns=["Actual", "Predicted", "n"])
-    base_c = alt.Chart(cm).encode(x=alt.X("Predicted:N", sort=["Benign", "Malicious"]),
+    base_c = alt.Chart(cm).encode(x=alt.X("Predicted:N", sort=["Benign", "Malicious"], axis=alt.Axis(labelAngle=0)),
                                   y=alt.Y("Actual:N", sort=["Benign", "Malicious"]))
     ch = base_c.mark_rect().encode(color=alt.Color("n:Q", legend=None, scale=alt.Scale(scheme="blues"))) + \
         base_c.mark_text(fontSize=18).encode(text="n:Q", color=alt.condition(alt.datum.n > 250, alt.value("white"),
-                                                                              alt.value("#e5e7eb")))
+                                                                              alt.value("#0b1220")))
     with col.container(border=True):
         st.markdown(f"**{name}**")
         st.altair_chart(ch.properties(height=200), width="stretch")
@@ -78,7 +86,7 @@ with st.container(border=True):
     imp.columns = ["feature", "importance"]
     st.altair_chart(alt.Chart(imp).mark_bar().encode(
         x=alt.X("importance:Q", title="|coefficient| (scaled)" if pick == "Logistic Regression" else "Impurity importance"),
-        y=alt.Y("feature:N", sort="-x", title=None), color=alt.value("#22d3ee")).properties(height=380), width="stretch")
+        y=alt.Y("feature:N", sort="-x", title=None, axis=alt.Axis(labelLimit=260)), color=alt.value("#22d3ee")).properties(height=380), width="stretch")
     st.caption("Importance describes what the model uses, not what makes a file malicious. "
                "Correlated features share importance.")
 

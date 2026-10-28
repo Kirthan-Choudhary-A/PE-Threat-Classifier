@@ -31,8 +31,8 @@ if order == "Oldest first":
 pages = max(1, -(-len(f) // PAGE))
 page = st.number_input(f"Page (of {pages}) — {len(f)} scan(s)", 1, pages, 1)
 cur = f.iloc[(page - 1) * PAGE: page * PAGE]
-view = pd.DataFrame({"ID": cur["id"], "File": cur["name"], "Feature-vector SHA-256": cur["sha256"].str[:16] + "…",
-                     "Prediction": cur["label"], "Model": cur["model"], "Score": cur["score"].round(3),
+view = pd.DataFrame({"ID": cur["id"], "File": cur["name"], "SHA-256": cur["sha256"].str[:16] + "…",
+                     "Prediction": cur["label"], "Model": cur["model"], "Score": cur["score"].map("{:.3f}".format),
                      "Analyzed": cur["created_at"]})
 ev = st.dataframe(view, hide_index=True, width="stretch", on_select="rerun", selection_mode="multi-row")
 st.caption("Select one row to open its report, or exactly two rows to compare them.")

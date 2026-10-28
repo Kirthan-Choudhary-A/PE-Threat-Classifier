@@ -28,7 +28,7 @@ cards = [("Samples (cleaned)", f"{len(df):,}"), ("Benign", f"{ben:,}"), ("Malici
 for col, (t, v) in zip(st.columns(6), cards):
     with col.container(border=True):
         st.caption(t.upper())
-        st.markdown(f"### {v}")
+        st.markdown(f"#### {v}")
 
 a, b = st.columns([1, 2])
 with a.container(border=True):

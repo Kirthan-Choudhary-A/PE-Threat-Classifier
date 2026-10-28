@@ -52,7 +52,7 @@ Use `python -m streamlit` (not the bare `streamlit` command) so it runs in the s
 
 Scans are stored in `data/scans.db` (not committed). Uploaded executables are parsed in a separate process with a timeout and deleted afterwards; only their features and SHA-256 are stored. Nothing is ever executed. Real-file scanning has only been checked for false alarms on programs installed on this PC (`python src/probe_benign_files.py`, results in `outputs/real_file_probe.txt`), not on malware. Dataset samples come from the test split, which was already scored once, so they illustrate the models and are not a new evaluation.
 
-Smoke test: `python tests/test_dashboard.py`
+Smoke test: `python tests/test_dashboard.py`. Screenshots of every page are in `report/screenshots/` (regenerate with `python tests/take_screenshots.py`, needs `pip install playwright` and Microsoft Edge; it uses a throwaway scan database).
 
 ## Folder structure
 

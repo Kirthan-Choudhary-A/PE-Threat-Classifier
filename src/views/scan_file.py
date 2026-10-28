@@ -42,10 +42,15 @@ if src.startswith("Dataset"):
     X, names = row, [f"testsplit_row_{idx}" + ("_edited" if edited else "")]
     source = f"Test split row {idx}" + (" (values edited)" if edited else "")
 elif src.startswith("Upload exec"):
-    st.warning("Approximate: the ClaMP feature definitions are only partly documented, so 10 of the 58 features are "
-               "guessed or defaulted (packer signatures are not checked). The verdict is indicative only. It was "
-               "tested for false alarms on benign programs, not on real malware (no malware was obtained).",
-               icon="⚠️")
+    st.warning("Approximate scan: 10 of the 58 features are guessed or defaulted, and it has not been tested on "
+               "real malware. The verdict is indicative only.", icon="⚠️")
+    with st.expander("Why is this approximate?"):
+        st.markdown("The models need the 58 ClaMP features, but ClaMP's definitions are only partly documented.\n"
+                    "- 31 are read directly from the file; 17 are flag bits whose order was inferred from the data.\n"
+                    "- 8 are derived 0/1 flags that are best guesses (`fileinfo`, `CreationYear`, `ImageBase`, "
+                    "`SizeOfImage`, `SizeOfHeaders`, `LoaderFlags`, `sus_sections`, `non_sus_sections`).\n"
+                    "- 2 are not checked and set to defaults (`packer`, `packer_type`): no packer signatures are used.\n"
+                    "- Checked for false alarms on programs installed on this PC, not on real malware.")
     up = st.file_uploader("Windows executable (.exe / .dll, max 100 MB). It is parsed in a separate process and "
                           "deleted; only its features and SHA-256 are stored.", type=["exe", "dll"])
     if up is not None:

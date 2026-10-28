@@ -4,7 +4,7 @@ import altair as alt
 import pandas as pd
 import streamlit as st
 
-from dash_common import COLORS, DEMO_ROWS, LABEL_BEN, LABEL_MAL, list_scans, metrics_table, record_scans, test_rows
+from dash_common import COLORS, DEMO_ROWS, MODELS, LABEL_BEN, LABEL_MAL, list_scans, metrics_table, record_scans, test_rows
 
 model = st.session_state.get("active_model", "Random Forest")
 scans = list_scans()
@@ -24,7 +24,7 @@ for col, (title, val, sub) in zip(cols, [
         ("Total scans", len(scans), "scans made in this app"),
         (LABEL_MAL, mal, f"{mal / len(scans):.1%} of scans" if len(scans) else "predictions, not confirmed malware"),
         (LABEL_BEN, ben, f"{ben / len(scans):.1%} of scans" if len(scans) else "no scans yet"),
-        ("Test accuracy", f"{acc:.2%}", f"{model}, held-out test split (n=1,042)")]):
+        ("Test accuracy", f"{acc:.2%}", f"{model}, test split (n=1,042)")]):
     with col.container(border=True):
         st.caption(title.upper())
         st.markdown(f"## {val}")
@@ -60,10 +60,12 @@ with left.container(border=True):
         st.caption("Nothing to plot yet.")
 with right.container(border=True):
     st.markdown("**Model F1 on the test split**")
-    m = metrics_table().loc[["logistic_regression", "decision_tree", "random_forest"], ["f1"]].reset_index()
-    st.altair_chart(alt.Chart(m).mark_bar().encode(
-        x=alt.X("f1:Q", scale=alt.Scale(domain=[0.9, 1.0]), title="F1"), y=alt.Y("model:N", title=None),
-        color=alt.value("#22d3ee")).properties(height=260), width="stretch")
+    mt = metrics_table()
+    for name, key in MODELS.items():
+        f1 = float(mt.loc[key, "f1"])
+        st.markdown(f"**{name}** &nbsp; {f1:.4f}")
+        st.progress((f1 - 0.9) / 0.1)
+    st.caption("Bars are scaled from F1 0.90 to 1.00. ")
     st.caption("Measured values from outputs/metrics.csv.")
 
 st.markdown("**Recent scans**")

@@ -4,6 +4,7 @@ Everything shown comes from saved project outputs or from scans made in the app.
 Nothing here executes or parses an executable: scans work on feature rows only."""
 import hashlib
 import json
+import os
 import sqlite3
 from contextlib import closing
 from datetime import datetime
@@ -16,7 +17,7 @@ import streamlit as st
 
 ROOT = Path(__file__).resolve().parent.parent
 OUT = ROOT / "outputs"
-DB = ROOT / "data" / "scans.db"
+DB = Path(os.environ.get("STATICSCAN_DB", ROOT / "data" / "scans.db"))  # override for screenshots/tests
 CAT = "packer_type"
 MODELS = {"Logistic Regression": "logistic_regression", "Decision Tree": "decision_tree",
           "Random Forest": "random_forest"}
@@ -153,16 +154,17 @@ def ood_notes(f, info):
     """Warnings when an uploaded file looks unlike the ClaMP training samples."""
     feats, df = load_data()
     benign = df[df["class"] == 0]
-    notes = []
+    notes, reported = [], set()
     share = float(df["FH_char7"].mean())
     if info["pe_format"] == "PE32+":
         notes.append(f"64-bit (PE32+) image, but {share:.1%} of ClaMP samples carry the 32-bit machine flag.")
     for col, label in [("MajorLinkerVersion", "linker version"), ("MajorOperatingSystemVersion", "OS version"),
                        ("MajorSubsystemVersion", "subsystem version")]:
         if f[col] > benign[col].max():
+            reported.add(col)
             notes.append(f"{label} {f[col]} is above the maximum seen in benign ClaMP samples ({int(benign[col].max())}).")
     num = [c for c in feats if c != CAT]
-    out = [c for c in num if not df[c].min() <= f[c] <= df[c].max()]
+    out = [c for c in num if c not in reported and not df[c].min() <= f[c] <= df[c].max()]
     if out:
         notes.append(f"{len(out)} feature value(s) outside the training range: {', '.join(out[:6])}.")
     return notes
@@ -218,18 +220,20 @@ def render_report(rec):
                    "The score is a raw model score (for Random Forest, the average vote of its trees), "
                    "not a calibrated probability.", icon="⚠️")
     if real:
-        for n in extra["ood"]:
-            st.warning(f"Outside training data: {n} The verdict is less reliable.", icon="🧭")
+        if extra["ood"]:
+            st.warning("**Outside the training data** (the verdict is less reliable):\n\n"
+                       + "\n".join(f"- {n}" for n in extra["ood"]), icon="🧭")
         st.info("Approximate features: only part of the 58 features can be read exactly from a real file. "
                 "The verdict is indicative only. See the provenance table below.", icon="ℹ️")
         i = extra["info"]
         with st.container(border=True):
             st.markdown("**PE file information** (read statically; not all of it is a model feature)")
-            a, b, c, d_ = st.columns(4)
+            a, b, c, d_, e_ = st.columns(5)
             a.metric("Format", i["pe_format"] + (" DLL" if i["is_dll"] else ""))
             b.metric("File size", f"{i['file_size'] / 1024:,.0f} KB")
             c.metric("Sections", len(i["sections"]))
-            d_.metric("Imports", f"{i['imported_dlls']} DLLs / {i['imported_functions']} functions")
+            d_.metric("Imported DLLs", i["imported_dlls"])
+            e_.metric("Imported functions", i["imported_functions"])
             st.dataframe(pd.DataFrame(i["sections"]).rename(columns={
                 "name": "Section", "virtual_size": "Virtual size", "raw_size": "Raw size", "entropy": "Entropy",
                 "flags": "Flags"}), hide_index=True, width="stretch")
