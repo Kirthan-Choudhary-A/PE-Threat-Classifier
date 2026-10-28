@@ -1,0 +1,90 @@
+import altair as alt
+import pandas as pd
+import streamlit as st
+from sklearn.metrics import auc, average_precision_score, precision_recall_curve, roc_curve
+
+from dash_common import MODELS, OUT, importances, metrics_table, test_scores
+
+M = metrics_table()
+key = {n: f for n, f in MODELS.items()}
+st.title("Model Performance")
+st.caption("Dataset: ClaMP Integrated, cleaned to 5,207 samples. Stratified 80/20 split (seed 42): 4,165 train / "
+           "1,042 test. Hyperparameters tuned with 5-fold CV on train only; the test split was evaluated once and "
+           "the best model was chosen by CV F1.")
+
+cols = st.columns(3)
+for col, (name, k) in zip(cols, key.items()):
+    r = M.loc[k]
+    with col.container(border=True):
+        st.markdown(f"**{name}**" + ("  · best by CV" if k == "random_forest" else ""))
+        st.markdown(f"## F1 {r['f1']:.4f}")
+        st.markdown(f"Precision {r['precision']:.4f} · Recall {r['recall']:.4f}  \n"
+                    f"False-positive rate **{r['fpr']:.4f}** · ROC-AUC {r['roc_auc']:.4f}  \n"
+                    f"Accuracy {r['accuracy']:.4f}")
+base = M.loc["majority_baseline"]
+st.caption(f"Majority-class baseline for reference: F1 {base['f1']:.4f}, accuracy {base['accuracy']:.4f}, "
+           f"ROC-AUC {base['roc_auc']:.4f}.")
+
+g1, g2 = st.columns(2)
+long = (M.loc[list(key.values()), ["precision", "recall", "f1", "fpr"]].reset_index()
+        .melt("model", var_name="metric", value_name="value"))
+with g1.container(border=True):
+    st.markdown("**Precision, recall, F1 and FPR**")
+    st.altair_chart(alt.Chart(long).mark_bar().encode(
+        x=alt.X("metric:N", title=None), xOffset="model:N", y=alt.Y("value:Q", title=None),
+        color=alt.Color("model:N", title=None)).properties(height=300), width="stretch")
+
+y, sc = test_scores()
+roc, pr = [], []
+for name, k in key.items():
+    s = sc[name]
+    fpr, tpr, _ = roc_curve(y, s)
+    roc.append(pd.DataFrame({"fpr": fpr, "tpr": tpr, "model": f"{name} (AUC {auc(fpr, tpr):.4f})"}))
+    p, r_, _ = precision_recall_curve(y, s)
+    pr.append(pd.DataFrame({"recall": r_, "precision": p, "model": f"{name} (AP {average_precision_score(y, s):.4f})"}))
+with g2.container(border=True):
+    st.markdown("**ROC and precision-recall curves**")
+    which = st.radio("Curve", ["ROC", "Precision-recall"], horizontal=True, label_visibility="collapsed")
+    if which == "ROC":
+        d, x, yy = pd.concat(roc), "fpr", "tpr"
+    else:
+        d, x, yy = pd.concat(pr), "recall", "precision"
+    st.altair_chart(alt.Chart(d).mark_line().encode(
+        x=alt.X(f"{x}:Q", title=x.upper() if x == "fpr" else "Recall"),
+        y=alt.Y(f"{yy}:Q", title=yy.upper() if yy == "tpr" else "Precision"),
+        color=alt.Color("model:N", title=None)).properties(height=260), width="stretch")
+    st.caption("Curves are recomputed from the saved models on the same test split (read-only, no tuning).")
+
+st.markdown("**Confusion matrices (test split, malware = positive class)**")
+cm_cols = st.columns(3)
+for col, (name, k) in zip(cm_cols, key.items()):
+    r = M.loc[k]
+    cm = pd.DataFrame([("Benign", "Benign", int(r["TN"])), ("Benign", "Malicious", int(r["FP"])),
+                       ("Malicious", "Benign", int(r["FN"])), ("Malicious", "Malicious", int(r["TP"]))],
+                      columns=["Actual", "Predicted", "n"])
+    base_c = alt.Chart(cm).encode(x=alt.X("Predicted:N", sort=["Benign", "Malicious"]),
+                                  y=alt.Y("Actual:N", sort=["Benign", "Malicious"]))
+    ch = base_c.mark_rect().encode(color=alt.Color("n:Q", legend=None, scale=alt.Scale(scheme="blues"))) + \
+        base_c.mark_text(fontSize=18).encode(text="n:Q", color=alt.condition(alt.datum.n > 250, alt.value("white"),
+                                                                              alt.value("#e5e7eb")))
+    with col.container(border=True):
+        st.markdown(f"**{name}**")
+        st.altair_chart(ch.properties(height=200), width="stretch")
+        st.caption(f"FPR = {int(r['FP'])} / ({int(r['FP'])} + {int(r['TN'])}) = {r['fpr']:.4f}")
+
+with st.container(border=True):
+    pick = st.selectbox("Feature importance for", list(key), index=2)
+    imp = importances(pick).head(15).reset_index()
+    imp.columns = ["feature", "importance"]
+    st.altair_chart(alt.Chart(imp).mark_bar().encode(
+        x=alt.X("importance:Q", title="|coefficient| (scaled)" if pick == "Logistic Regression" else "Impurity importance"),
+        y=alt.Y("feature:N", sort="-x", title=None), color=alt.value("#22d3ee")).properties(height=380), width="stretch")
+    st.caption("Importance describes what the model uses, not what makes a file malicious. "
+               "Correlated features share importance.")
+
+with st.expander("Cross-validation vs test, and robustness check"):
+    cv = pd.read_csv(OUT / "cv_results.csv").set_index("model")
+    cmp_ = pd.DataFrame({"CV F1 (train)": cv["cv_f1_mean"], "Test F1": M.loc[cv.index, "f1"]}).round(4)
+    st.dataframe(cmp_, width="stretch")
+    st.markdown("Repeated 5x3 CV on train with suspect columns removed (`outputs/robustness_cv.csv`):")
+    st.dataframe(pd.read_csv(OUT / "robustness_cv.csv").round(4), hide_index=True, width="stretch")

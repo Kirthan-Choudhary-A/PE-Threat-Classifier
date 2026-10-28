@@ -31,21 +31,33 @@ python src/robustness_cv.py     # optional: CV-only robustness check (train spli
 
 Each script depends on the output of the previous one. Seed 42 is used everywhere.
 
-## Demo UI
+## Demo dashboard
 
-After running the four scripts above (the app reads their saved outputs and models):
+After running the four scripts above (the dashboard reads their saved outputs and models), start it from the project root:
 
 ```
 python -m streamlit run src/app.py
 ```
 
-Use `python -m streamlit` (not the bare `streamlit` command), so it runs in the same Python that has the project packages and saved models. It opens in the browser (http://localhost:8501) with two tabs: **Results** (test metrics, ROC, confusion matrices, feature importance, limitations) and **Live prediction** (pick a test-split file, optionally edit a few header values, and see each model's verdict and malware probability). The test rows were already scored once during evaluation, so the live tab is an illustration, not a new evaluation.
+Use `python -m streamlit` (not the bare `streamlit` command) so it runs in the same Python that has the project packages. It opens at http://localhost:8501 with a dark multi-page layout:
+
+- **Overview**: scan counts, activity chart and recent scans (zeros and empty states until you scan something), plus the real test accuracy.
+- **Scan File**: score a dataset sample (with what-if editing) or an uploaded feature CSV (template provided). Shows a report with all three models, top features vs dataset medians, and a Markdown download.
+- **Scan History**: search, filter, export, open a report, or compare two scans.
+- **Model Performance**: real test metrics, grouped bar chart, ROC and precision-recall curves, confusion matrices, feature importance, CV vs test and the robustness check.
+- **Dataset Explorer**: class balance, data-quality counts, per-class feature histograms and a correlation heatmap.
+- **About Project**: method and limitations.
+
+Scans are stored in `data/scans.db` (not committed). The app scores rows of pre-extracted features only and never parses or executes an executable; real `.exe` upload is deliberately not supported (see About Project). Dataset samples come from the test split, which was already scored once, so they illustrate the models and are not a new evaluation.
+
+Smoke test: `python tests/test_dashboard.py`
 
 ## Folder structure
 
 ```
 data/      dataset CSV and the persisted split (X_train, X_test, y_train, y_test)
-src/       the four scripts above
+src/       the pipeline scripts, plus app.py and views/ (dashboard)
+tests/     dashboard smoke test
 models/    trained pipelines (logistic_regression, decision_tree, random_forest .joblib)
 outputs/   all results: text summaries, CSV tables, PNG plots
 report/    REPORT.md
