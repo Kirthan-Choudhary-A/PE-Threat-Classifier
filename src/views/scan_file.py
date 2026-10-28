@@ -46,7 +46,7 @@ elif src.startswith("Upload exec"):
                "guessed or defaulted (packer signatures are not checked). The verdict is indicative only. It was "
                "tested for false alarms on benign programs, not on real malware (no malware was obtained).",
                icon="⚠️")
-    up = st.file_uploader("Windows executable (.exe / .dll, max 20 MB). It is parsed in a separate process and "
+    up = st.file_uploader("Windows executable (.exe / .dll, max 100 MB). It is parsed in a separate process and "
                           "deleted; only its features and SHA-256 are stored.", type=["exe", "dll"])
     if up is not None:
         st.caption(f"Selected: {up.name} ({up.size / 1024:.1f} KB)")

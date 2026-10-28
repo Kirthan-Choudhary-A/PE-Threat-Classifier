@@ -8,13 +8,13 @@ The ClaMP feature definitions are not fully documented, so each feature gets a p
   default      not checked (packer signatures are not available)
 Verdicts on uploaded files are therefore indicative only."""
 import json
-import math
 import subprocess
 import sys
 import tempfile
-from collections import Counter
 from datetime import datetime, timezone
 from pathlib import Path
+
+import numpy as np
 
 # FILE_HEADER.Characteristics flags in PE-spec order (FH_char0..14) and optional-header DLL flags
 # (OH_DLLchar0..10). Order inferred from the dataset (e.g. FH_char7 ~ 1.0 = 32-bit machine, FH_char12 = DLL;
@@ -30,14 +30,15 @@ RAW_OH = ["MajorLinkerVersion", "MinorLinkerVersion", "SizeOfCode", "SizeOfIniti
           "MajorSubsystemVersion", "MinorSubsystemVersion", "CheckSum", "Subsystem", "SizeOfStackReserve",
           "SizeOfStackCommit", "SizeOfHeapReserve", "SizeOfHeapCommit"]
 RAW_DOS = ["e_cblp", "e_cp", "e_cparhdr", "e_maxalloc", "e_sp", "e_lfanew"]
-MAX_BYTES = 20_000_000
+MAX_BYTES = 100_000_000
 
 
 def entropy(b):
     if not b:
         return 0.0
-    n = len(b)
-    return -sum(c / n * math.log2(c / n) for c in Counter(b).values())
+    counts = np.bincount(np.frombuffer(b, dtype=np.uint8), minlength=256)
+    p = counts[counts > 0] / len(b)
+    return float(-(p * np.log2(p)).sum())
 
 
 def extract(path):
