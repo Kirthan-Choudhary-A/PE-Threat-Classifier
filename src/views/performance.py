@@ -97,3 +97,11 @@ with st.expander("DLL-like flag check (FH_char12, train-split CV)"):
     st.dataframe(pd.read_csv(OUT / "dll_shortcut_subgroups.csv").round(4), hide_index=True, width="stretch")
     st.caption("False-positive rates are several times higher on EXE-like files than on DLL-like files, and the "
                "DLL-like group has only 39 malware samples, so its recall is noisy.")
+
+with st.expander("Variation across 20 random splits (supplementary)"):
+    st.markdown("All 5,207 cleaned samples re-split 20 times (stratified 80/20) with the already-chosen "
+                "hyperparameters (`src/repeated_splits.py`). A variance estimate, slightly optimistic, "
+                "not a replacement for the single held-out evaluation above.")
+    sm = pd.read_csv(OUT / "repeated_splits_summary.csv").set_index("model")
+    st.dataframe(sm[["f1_mean", "f1_std", "f1_min", "f1_max", "fpr_mean", "fpr_std", "fpr_min", "fpr_max",
+                     "roc_auc_mean"]].round(4), width="stretch")

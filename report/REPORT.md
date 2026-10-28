@@ -182,6 +182,18 @@ Most of these files are 64-bit and built with toolchains far newer than the ClaM
 
   Two things stand out. First, the false-positive rate on EXE-like files is several times higher than on DLL-like files, because most benign DLL-like files are easy to recognise; the overall FPR (0.0100 for Random Forest on the test split) is therefore helped by DLLs. Second, the DLL-like group contains only 39 malware samples, so the recall estimates there are noisy (Random Forest: 35 of 39 found). The Logistic Regression recall of 0.3590 on that group shows a simple linear model largely treats DLL-like files as benign.
 
+### 6.8 Variation across random splits (supplementary)
+
+The main evaluation uses one 80/20 split. To see how much the headline numbers depend on that split, `src/repeated_splits.py` re-split all 5,207 cleaned samples 20 times (stratified 80/20, seeds 100 to 119) and evaluated each model with its already-chosen hyperparameters (nothing re-tuned). This is a **variance estimate, not a replacement for Section 6.2**: those hyperparameters were chosen on the original train split, whose rows appear in the test part of other splits, so the numbers are slightly optimistic. Results are in `outputs/repeated_splits.csv` and `outputs/repeated_splits_summary.csv`.
+
+| Model | F1 mean +/- std (min to max) | FPR mean +/- std (min to max) | ROC-AUC mean |
+|---|---|---|---|
+| Logistic Regression | 0.9643 +/- 0.0048 (0.9519 to 0.9717) | 0.0418 +/- 0.0109 (0.0281 to 0.0663) | 0.9920 |
+| Decision Tree | 0.9779 +/- 0.0046 (0.9688 to 0.9872) | 0.0236 +/- 0.0072 (0.0141 to 0.0361) | 0.9791 |
+| Random Forest | 0.9926 +/- 0.0027 (0.9872 to 0.9963) | 0.0104 +/- 0.0036 (0.0040 to 0.0181) | 0.9995 |
+
+The single-split test results (Random Forest F1 0.9899 and FPR 0.0100; Decision Tree 0.9742 and 0.0241; Logistic Regression 0.9686 and 0.0301) all lie inside these ranges. The ranking Random Forest > Decision Tree > Logistic Regression held in all 20 splits, for both F1 and FPR. The FPR varies noticeably from split to split (Random Forest 0.0040 to 0.0181), which is expected with only about 500 benign files in each test part, so single-split FPR values should be read as approximate.
+
 ## 7. Comparison and discussion
 
 - **Best model: Random Forest**, chosen by cross-validated F1 on the training split (0.9917 +/- 0.0042) before the test set was opened. On the test split it also had the best precision, recall, F1, FPR and ROC-AUC of the three models.
@@ -192,7 +204,7 @@ Most of these files are 64-bit and built with toolchains far newer than the ClaM
 
 ## 8. Limitations
 
-- **Single split.** One 80/20 split and one test set. There is no repeated-split or repeated-CV estimate of variance on the test side.
+- **Single split.** The main results come from one 80/20 split and one test set. A supplementary 20-split experiment (Section 6.8) shows the headline numbers lie within the range seen across random splits, but it re-uses hyperparameters chosen on the original train split and is not a replacement for the held-out evaluation.
 - **Near-balanced classes.** The test set has 544 malware and 498 benign files. Real-world malware prevalence is much lower, so precision and FPR here are optimistic.
 - **Header-only features.** Only static PE-header features were used. Import counts / imported-DLL features are not in this dataset (see Section 3), and no behavioural or code-level features were available.
 - **Dataset source artefacts.** Benign and malware files may come from different collection sources, so models can learn artefacts of how the data was collected instead of malicious behaviour. Examples in the data: `fileinfo` has a mean of 0.8101 for benign and 0.2970 for malware in the training split, and `CheckSum` was the strongest single-feature separator in the analysis (single-feature depth-3 tree CV AUC 0.8134). Both `fileinfo` and `CheckSum` also rank high in the Random Forest importance.

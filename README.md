@@ -28,6 +28,7 @@ python src/train_models.py      # GridSearchCV (5-fold) on train only; saves mod
 python src/evaluate_models.py   # opens the test split once; metrics, plots, evaluation_summary.txt
 python src/robustness_cv.py     # optional: CV-only robustness check (train split), wider LR C grid
 python src/dll_shortcut_cv.py   # optional: CV-only check of the DLL-like flag shortcut (train split)
+python src/repeated_splits.py   # optional: variance across 20 random splits (about 2 minutes)
 ```
 
 Each script depends on the output of the previous one. Seed 42 is used everywhere.
@@ -72,6 +73,7 @@ report/    REPORT.md
 - `outputs/metrics.csv`, `outputs/evaluation_summary.txt` - final test-set metrics
 - `outputs/robustness_cv.csv`, `outputs/lr_C_extended_cv.csv` - robustness check (CV on train only)
 - `outputs/dll_shortcut_cv.csv`, `outputs/dll_shortcut_subgroups.csv` - DLL-like flag check (CV on train only)
+- `outputs/repeated_splits.csv`, `outputs/repeated_splits_summary.csv` - variation across 20 random splits
 - `outputs/*.png` - confusion matrices, ROC curves, model comparison, feature importance
 
 ## Report
