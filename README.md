@@ -29,6 +29,7 @@ python src/evaluate_models.py   # opens the test split once; metrics, plots, eva
 python src/robustness_cv.py     # optional: CV-only robustness check (train split), wider LR C grid
 python src/dll_shortcut_cv.py   # optional: CV-only check of the DLL-like flag shortcut (train split)
 python src/repeated_splits.py   # optional: variance across 20 random splits (about 2 minutes)
+python src/improve_cv.py        # optional: CV-only search for better models (about 10 minutes; found no clear gain)
 ```
 
 Each script depends on the output of the previous one. Seed 42 is used everywhere.

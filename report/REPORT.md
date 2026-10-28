@@ -194,6 +194,20 @@ The main evaluation uses one 80/20 split. To see how much the headline numbers d
 
 The single-split test results (Random Forest F1 0.9899 and FPR 0.0100; Decision Tree 0.9742 and 0.0241; Logistic Regression 0.9686 and 0.0301) all lie inside these ranges. The ranking Random Forest > Decision Tree > Logistic Regression held in all 20 splits, for both F1 and FPR. The FPR varies noticeably from split to split (Random Forest 0.0040 to 0.0181), which is expected with only about 500 benign files in each test part, so single-split FPR values should be read as approximate.
 
+### 6.9 Attempt to improve the models (supplementary, train split only)
+
+To check whether the Random Forest could be improved, `src/improve_cv.py` tuned four alternatives with 5-fold CV on the train split and then compared them with the current Random Forest on repeated 5x3 CV using different fold seeds (so the comparison is not on the folds used for tuning). The test split was not used. Results are in `outputs/improve_cv.csv` (mean over 15 folds; FPR = false-positive rate).
+
+| Model | CV F1 mean +/- std | CV FPR mean | ROC-AUC |
+|---|---|---|---|
+| Random Forest (current, chosen earlier) | 0.9922 +/- 0.0021 | 0.0119 | 0.9995 |
+| Random Forest, wider grid (500 trees, class weights, other max_features) | 0.9913 +/- 0.0022 | 0.0136 | 0.9995 |
+| Extra Trees | 0.9896 +/- 0.0023 | 0.0114 | 0.9990 |
+| Histogram gradient boosting | 0.9913 +/- 0.0023 | 0.0119 | 0.9995 |
+| Soft-voting ensemble (RF + Extra Trees + gradient boosting) | 0.9924 +/- 0.0017 | 0.0097 | 0.9995 |
+
+None of the alternatives is clearly better. The ensemble differs from the current Random Forest by +0.0002 in F1 and -0.0022 in FPR, both well inside one standard deviation (0.0017 to 0.0042) of the fold-to-fold variation. The wider Random Forest grid scored higher in its own tuning folds (0.9922) than on the fresh folds (0.9913), which is the usual optimism of tuning on the same folds. Conclusion: on these 58 header features the models are already at the ceiling of what this dataset supports, so the Random Forest was kept and nothing was re-evaluated on the test split. Further gains would more likely come from better data (for example modern samples and import features) than from more model tuning.
+
 ## 7. Comparison and discussion
 
 - **Best model: Random Forest**, chosen by cross-validated F1 on the training split (0.9917 +/- 0.0042) before the test set was opened. On the test split it also had the best precision, recall, F1, FPR and ROC-AUC of the three models.
